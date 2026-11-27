@@ -33,7 +33,6 @@ def approved_material_candidate(db, snapshot, asset_id, row, subject):
 # router. Existing preference parser remains authoritative for other utterances.
 _INITIAL = re.compile(r"\s*(?:i[’']m|i am|we[’']re|we are) looking for (?:a |an )?([1-9]|1\d|20)[ -]bedroom(?:s)? (?:house|home|property|apartment)s?[.!]?\s*", re.I)
 _ACCEPT = re.compile(r"\s*(?:yes[, ]+)?([1-9]|1\d|20)\s*bedrooms?\s*(?:(?:is|are|it[’']s|is also)\s*)?(?:ok(?:ay)?|fine|acceptable|works(?: for me)?)[.!]?\s*", re.I)
-_ALT = re.compile(r'\b(?:open to|explor\w*|alternative\w*|adjust|consider\w*)\b', re.I)
 
 
 def contextual_bedrooms(message, prior_state, prior_reply=None):
@@ -49,18 +48,26 @@ def contextual_bedrooms(message, prior_state, prior_reply=None):
     if not accepted or not isinstance(prior_reply, str):
         return {}
     search = prior_state.get('active_search') or {}
-    if search.get('match_count') != 0 or not _ALT.search(prior_reply):
+    # A concrete acceptance follows the previous unsuccessful bedroom search.
+    # Do not infer a permanent preference from search arguments or require the
+    # assistant to have used a particular English invitation.
+    criteria = search.get('criteria') or {}
+    if (search.get('match_count') != 0 or existing.get('mode') != 'preferred'
+            or type(existing.get('preferred')) is not int
+            or criteria.get('bedrooms') != existing['preferred']
+            or set(criteria) != {'bedrooms'}):
         return {}
     n = int(accepted[1])
-    if not re.search(rf'(?<!\d){n}\s*[- ]?\s*bedrooms?\b', prior_reply, re.I):
-        # An open invitation to adjust the bedroom count can be answered by
-        # the buyer naming the new count. Only the final, immediate question
-        # can supply this evidence; a specific different offer cannot.
-        invitation=re.split(r'(?<=[.!?])\s+|\n+',prior_reply.strip())[-1]
-        if (not invitation.endswith('?') or not _ALT.search(invitation)
-                or not re.search(r'\bdifferent number of bedrooms\b',invitation,re.I)
-                or re.search(r'\b\d+\s*[- ]?\s*bedrooms?\b',invitation,re.I)):
-            return {}
+    if n == existing['preferred']:
+        return {}
+    # A reply offering a different explicit number is not the same acceptance.
+    # The current buyer's words, not model text, supply the new count.
+    invitation = re.split(r'(?<=[.!?])\s+|\n+', prior_reply.strip())[-1]
+    if not invitation.endswith('?'):
+        return {}
+    counts = {int(x) for x in re.findall(r'\b(\d+)\s*[- ]?\s*bedrooms?\b', invitation, re.I)}
+    if counts and counts != {n}:
+        return {}
     return {'bedrooms': {'mode': 'preferred', 'preferred': n}}
 
 
@@ -78,6 +85,17 @@ def live_preference_context(db, scope, conversation, inbound, prior_state):
     prior_reply = (previous.content if previous and previous.direction == 'outbound'
                    and previous.role == 'assistant' and previous.provider_message_id
                    and previous.status in {'sent', 'accepted', 'delivered', 'read'} else None)
+    if prior_reply:
+        search = prior_state.get('active_search') or {}
+        source = search.get('source_inbound_message_id')
+        if source:
+            prior_inbound = scoped_messages_query(db, conversation).filter(
+                SalesMessage.direction == 'inbound', SalesMessage.role == 'user',
+                or_(SalesMessage.created_at < previous.created_at,
+                    and_(SalesMessage.created_at == previous.created_at, SalesMessage.id < previous.id)),
+            ).order_by(SalesMessage.created_at.desc(), SalesMessage.id.desc()).first()
+            if not prior_inbound or prior_inbound.id != source:
+                prior_reply = None
     return contextual_bedrooms(inbound.content, prior_state, prior_reply)
 
 

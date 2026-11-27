@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.modules.project_team.service import eligible_appointment_assignments, select_next_sales_user
 from app.modules.users.models import User
+# Provider functions are kept import-compatible; availability never calls them.
 from app.integrations.gcalendar_client import (
     calendar_busy_ranges,
     create_calendar_event_for_connection,
@@ -287,15 +288,11 @@ def _is_free(
         return False
     if external_busy is not None:
         return not any(busy_start < ends_at and busy_end > starts_at for busy_start, busy_end in external_busy)
-    connection = db.query(CalendarConnection).filter(
-        CalendarConnection.user_id == user_id,
-        CalendarConnection.provider == "google",
-        CalendarConnection.status == "connected",
-    ).first()
-    if connection and excluded_meeting and excluded_meeting.assigned_sales_user_id==user_id and excluded_meeting.gcal_event_id:
-        from app.integrations.gcalendar_client import calendar_busy_ranges_excluding_event
-        return not calendar_busy_ranges_excluding_event(db,connection,starts_at=starts_at,ends_at=ends_at,event_id=excluded_meeting.gcal_event_id)
-    return not connection or is_calendar_free(db, connection, starts_at=starts_at, ends_at=ends_at)
+    # BlackPenguin working blocks and active meetings are the reservation
+    # source of truth. Google Calendar is a post-booking projection only.
+    # An explicitly supplied interval list remains supported for callers
+    # passing additional constraints; never fetch provider credentials here.
+    return True
 
 
 def eligible_users_for_slot(
@@ -365,22 +362,8 @@ def available_slots(
     if cursor <= after:
         cursor += timedelta(minutes=30)
     end = after + timedelta(days=days)
-    external_busy_by_user: dict[str, list[tuple[datetime, datetime]]] = {}
-    for assignment in eligible_appointment_assignments(db, project_id):
-        if allowed_sales_user_ids is not None and assignment.user_id not in allowed_sales_user_ids:continue
-        connection = db.query(CalendarConnection).filter(
-            CalendarConnection.user_id == assignment.user_id,
-            CalendarConnection.provider == "google",
-            CalendarConnection.status == "connected",
-        ).first()
-        if connection and excluded_meeting and excluded_meeting.assigned_sales_user_id==assignment.user_id and excluded_meeting.gcal_event_id:
-            from app.integrations.gcalendar_client import calendar_busy_ranges_excluding_event
-            external_busy_by_user[assignment.user_id]=calendar_busy_ranges_excluding_event(db,connection,starts_at=after,ends_at=end,event_id=excluded_meeting.gcal_event_id)
-            continue
-        external_busy_by_user[assignment.user_id] = (
-            calendar_busy_ranges(db, connection, starts_at=after, ends_at=end)
-            if connection else []
-        )
+    # Do not prefetch Google FreeBusy. The same local availability policy is
+    # used here, in exact-slot revalidation and in create_agent_appointment.
     result = []
     # Only the optional day-discovery view skips the remaining candidates after
     # an actually eligible start. All existing exact-slot callers are unchanged.
@@ -394,7 +377,6 @@ def available_slots(
             project_id=project_id,
             starts_at=cursor,
             duration_minutes=duration_minutes,
-            external_busy_by_user=external_busy_by_user,
             excluded_meeting=excluded_meeting,
             allowed_sales_user_ids=allowed_sales_user_ids,
         )

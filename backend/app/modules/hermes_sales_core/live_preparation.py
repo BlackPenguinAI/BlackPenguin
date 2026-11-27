@@ -161,6 +161,8 @@ def _live_port(db,snapshot,working,inbound,holds):
         def _slots(self,args):
             result=super()._slots(args)
             if result.get('ok'):
+                options = result.get('available_slots') or result.get('available_dates') or []
+                result = {**result, 'availability_status': 'AVAILABLE' if options else 'NO_SLOTS'}
                 self.slot_batches.append({'result':deepcopy(result),'offer':deepcopy(self.state.get('last_slot_search')),
                     'draft':deepcopy(self.state.get('visit_draft')),'args':deepcopy(args)})
             return result
@@ -386,8 +388,15 @@ def prepare_live_turn(db,scope,*,inbound_message_id,run_id):
                 'Do not repeat or replace this choice or claim a visit is booked.')}
     pre_domain_count=len(port.domain_observations)
     from .material_continuity import (GUIDANCE as material_guidance, MATERIALS, redact,
-        has_private_link, composition, continuation_question, REDACTED, shared_materials)
+        has_private_link, composition, standalone_question, REDACTED, shared_materials)
     context['material_delivery_guidance']=material_guidance
+    context['visit_availability_guidance'] = (
+        'Use get_available_visit_slots for the active visit property. Use next week or an ISO date '
+        'when the buyer specifies a period or day. AVAILABLE means show the verified days or times '
+        'with the property name and project timezone; NO_SLOTS means the query succeeded but no '
+        'times matched. A rejected tool call is not NO_SLOTS. Preserve the visit objective and do '
+        'not ask for the property again when its reference is known. A date or hour selection '
+        'is not booking consent. Never invent an available slot or claim booking without receipt.')
     context['shared_materials']=shared_materials(working.get('shared_media'),data.commercial.get('available_assets') or [])
     # Preserve original scoped history for receipt/consent checks above; only
     # the projection sent to the SDK is redacted.
@@ -436,7 +445,7 @@ def prepare_live_turn(db,scope,*,inbound_message_id,run_id):
         # Never include the marker or claim that an unissued share was sent in
         # the provisional receipt. Existing native authorization stays intact.
         template=composition(reply)
-        question=continuation_question(reply)
+        question=standalone_question(reply)
         material_copy={'template':template,'question':question}
         port.offered_media=None  # an offer not in the provisional text is not consent evidence
         reply='I found a matching resource. Let me get it for you.'
@@ -489,7 +498,7 @@ def prepare_live_turn(db,scope,*,inbound_message_id,run_id):
                 return None
             return candidate
         template=composition(verified_copy(material_copy['template']))
-        question=continuation_question(verified_copy(material_copy['question']))
+        question=standalone_question(verified_copy(material_copy['question']))
         if template or question:
             pending['commercial_copy']={'template':template,'question':question}
     # A private bearer is never legal in an informational draft. Recover only

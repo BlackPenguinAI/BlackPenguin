@@ -24,8 +24,9 @@ GUIDANCE = (
     'When get_unit_media returns pending_backend_share, write the natural text '
     'for the requested material delivery with [[AUTHORIZED_MATERIALS]] alone on '
     'its own line where the backend will insert the authorized resources. '
-    'Use the property name. An optional relevant next question may follow; '
-    'offer only other verified materials, without sending them or claiming a '
+    'Use the property name. An optional relevant next question may follow. '
+    'Make the next question self-contained and name the actual resource or next step. '
+    'Offer only other verified materials, without sending them or claiming a '
     'booking, delivery or other action already succeeded. For discovery only, '
     'answer normally without the marker. Do not force a question every turn.'
 )
@@ -113,5 +114,13 @@ def render_delivery(approved_block, draft_copy=None, *, resource_block=None):
     if template:
         # The native resource block includes the exact approved names and links.
         return template.replace(MATERIALS, resource_block if resource_block is not None else approved_block)
-    question = continuation_question(draft_copy.get('question'))
+    question = standalone_question(draft_copy.get('question'))
     return approved_block + ('\n\n' + question if question else '')
+
+
+def standalone_question(text):
+    """Do not extract a dangling anaphor from discarded model prose."""
+    question = continuation_question(text)
+    if question and re.search(r"\b(?:that|this|it|them|those|these)\s*[?]$", question, re.I):
+        return None
+    return question
