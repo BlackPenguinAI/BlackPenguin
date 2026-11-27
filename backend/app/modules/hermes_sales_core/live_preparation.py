@@ -265,8 +265,8 @@ def prepare_live_turn(db,scope,*,inbound_message_id,run_id):
     Requires a reserved live run and current policy. No second model. The
     caller owns transaction lifetime and must release it before dispatch.
     """
-    db.info['hermes_sdk_checkpoint']='load_context'
     require_selectable(HERMES)
+    db.info['hermes_sdk_checkpoint']='load_context'
     from .bp_context import build_bp_snapshot
     from .bp_state_store import load
     from .bp_turn import PreparedHermesTurn

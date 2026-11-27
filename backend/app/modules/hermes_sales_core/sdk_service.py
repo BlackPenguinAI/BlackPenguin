@@ -50,8 +50,8 @@ def _prepare_reserved(db,request):
     from .live_preparation import reserve_live_run,prepare_live_turn
     from .live_coordinator import persist_live_draft,restore_draft
     from .production_tools import ProductionToolError
-    db.info['hermes_sdk_checkpoint']='reserve_run'
     require_selectable(HERMES)
+    db.info['hermes_sdk_checkpoint']='reserve_run'
     job,scope,conversation,lead,inbound=lock_job(db,request.job_id)
     inbound_id=inbound.id
     run=reserve_live_run(db,scope,inbound_message_id=inbound_id)
