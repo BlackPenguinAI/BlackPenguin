@@ -115,6 +115,7 @@ def _live_port(db,snapshot,working,inbound,holds):
             self.search_rows=None;self.choice=None;self.explicit_focus=None;self.discovered={};self.offered_media=None
             self.search_batches=[];self.slot_batches=[];self.comparison_batches=[]
             self.comparison_rows=[];self.comparison_details={};self.primary_captured=False
+            self.prepared_visit=None;self.domain_observations=[]
             self.prior_visit_offer=deepcopy(working.get('last_slot_search'))
             self.prior_visit_draft=deepcopy(working.get('visit_draft'))
 
@@ -168,14 +169,19 @@ def _live_port(db,snapshot,working,inbound,holds):
             if holds:
                 return {'error':'Approved commercial restrictions require staff review.','error_code':'COMMERCIAL_POLICY_HOLD'}
             try:
+                from .commercial_delivery import replay_visit_choice
+                resolved=replay_visit_choice(self,name,arguments)
+                if resolved is not None:
+                    return resolved
                 return super().invoke(name,arguments,scope)
             finally:
                 # Draft tools only read; release any read/asset lock between calls.
                 db.rollback()
 
         def _search(self,args):
-            from .commercial_delivery import reconcile_temporary_filters
+            from .commercial_delivery import reconcile_temporary_filters,strict_search_bounds
             args=reconcile_temporary_filters(self.message,self.state,args)
+            args=strict_search_bounds(self.message,args)
             result=super()._search(args)
             if result.get('ok'):
                 # Exact, turn-local copies from the authorized port, not the
@@ -312,21 +318,45 @@ def prepare_live_turn(db,scope,*,inbound_message_id,run_id):
     buyer_message=inbound.content; channel=conversation.channel
     db.commit()  # no row lock or open transaction during LLM inference
     from .commercial_delivery import (primary_declaration,primary_ack,search_reply,visit_reply,compare_reply,
-        verified_budget_profile)
-    if (len(sources)==1 and 'update_search_preferences' in enabled
-            and primary_declaration(buyer_message,working)):
-        capture=port.invoke('update_search_preferences',{},scope)
-        if capture.get('ok'):
-            port.primary_captured=True
-            context['primary_preferences']=deepcopy(working.get('search_preferences'))
+        verified_budget_profile,capture_primary,prepare_visit_choice,ensure_search,safe_visit_tools)
+    primary_snapshot=None
+    if len(sources)==1:
+        # Demo begin_turn: capture only explicit self-declarations and resolve
+        # only an actually delivered typed visit choice. Native port and policy
+        # remain the sole authority; no provider effect can occur here.
+        primary_snapshot=capture_primary(port,enabled)
+        if ('update_search_preferences' in enabled and primary_declaration(buyer_message,working)
+                and primary_snapshot is None):
+            raise ProductionToolError('Explicit preference capture requires reconciliation.')
+        selected=prepare_visit_choice(port,enabled)
+        context.update(primary_preferences=deepcopy(working.get('search_preferences')),
+            visit_draft=deepcopy(working.get('visit_draft')),
+            last_slot_search=deepcopy(working.get('last_slot_search')),
+            confirmation_request=deepcopy(working.get('confirmation_request')))
+        if selected:
+            context['verified_visit_selection']={'type':selected['kind'],
+                'result':selected['result'], 'guidance':('The current selection was already verified by the domain. '
+                'Use this result to answer. A selected day needs a time; a selected time is not booking consent. '
+                'Do not repeat or replace this choice or claim a visit is booked.')}
+    pre_domain_count=len(port.domain_observations)
     result=HermesSalesRuntime(settings,port,state_draft_tools=frozenset({'update_search_preferences'}),
         operational_draft_tools=LIVE_DRAFT_TOOLS,enabled_tools=enabled).process_turn(TurnRequest(
             scope=scope,message=buyer_message,history=history,verified_context=context,channel=channel))
+    if primary_snapshot is not None and working.get('search_preferences')!=primary_snapshot:
+        raise ProductionToolError('Explicit preference draft changed after inference.')
+    # Recover a missing/wrong unambiguous search only through the authorized
+    # read port, like demo delivery_policy. Mixed or denied operations stay
+    # on the normal path. Finalize against the actual resulting search rows.
+    if len(sources)==1:
+        ensure_search(port,result.tool_observations,enabled)
+    catalog_observations=(port.domain_observations[:pre_domain_count]+result.tool_observations+
+                          port.domain_observations[pre_domain_count:])
     reply=port.finalize_reply(result.reply)
     pending=(working.get('offered_assets') or {}).get('pending_request') or {}
     booking=working.get('confirmation_request') or {}
     material_now=pending.get('source_inbound_message_id')==inbound_message_id
     booking_now=booking.get('status')=='execution_requested' and booking.get('confirmed_inbound_message_id')==inbound_message_id
+    canonical_budget=False
     if material_now and booking_now:
         raise ProductionToolError('Concurrent commercial effects need separate turns.')
     if material_now:reply='I found the requested material. I still need to validate the share before sending it.'
@@ -337,27 +367,37 @@ def prepare_live_turn(db,scope,*,inbound_message_id,run_id):
         from .live_changes import change_recap
         reply=change_recap(booking)
     elif len(sources)==1:
+        if port.prepared_visit and not safe_visit_tools(port,result.tool_observations):
+            raise ProductionToolError('Verified visit selection requires reconciliation.')
         # Domain-owned verified delivery contracts, as in demo v13.3.3.
         # Never re-run an external action or replace Hermes's inference loop.
         commercial_reply=visit_reply(port,result.tool_observations,enabled)
         if commercial_reply is None:
             commercial_reply=compare_reply(port,result.tool_observations)
+        if commercial_reply is None:
+            commercial_reply=search_reply(port,result.tool_observations,channel,model_reply=reply)
+            canonical_budget=commercial_reply is not None
+        # A simple explicit declaration is a state update, not a required
+        # search. Keep the natural answer when it is already grounded; the
+        # monetary fallback below can acknowledge the verified declaration.
         if commercial_reply is not None:
             reply=commercial_reply
     from app.modules.sales_agent.response_policy import render_channel_text,split_channel_text
     from app.modules.sales_agent.monetary_policy import validate_monetary_reply
     from app.modules.sales_agent.language_policy import detect,scoped_names
     reply=render_channel_text(reply,channel)
-    checked,evidence=validate_monetary_reply(reply,data.commercial,lead_profile=lead_view.lead_profile_data)
+    initial_profile=(verified_budget_profile(port,result.tool_observations,lead_view.lead_profile_data)
+                     if canonical_budget else lead_view.lead_profile_data)
+    checked,evidence=validate_monetary_reply(reply,data.commercial,lead_profile=initial_profile)
     from .numbered_catalog import reconcile_direct_catalog
     # A direct, exact catalog-list request is a structured presentation
     # contract even if the model happened to quote valid prices. Preserve its
     # order when proven, and avoid letting a speculative search change the
     # membership of the new menu. Non-eligible turns keep the ordinary path.
     direct_repair = None
-    if not (material_now or booking_now or len(sources)>1) and port.search_batches:
+    if not (material_now or booking_now or len(sources)>1 or canonical_budget) and port.search_batches:
         direct_repair=reconcile_direct_catalog(reply,buyer_message=buyer_message,
-            search_batches=port.search_batches,menus=port.menus,observations=result.tool_observations,
+            search_batches=port.search_batches,menus=port.menus,observations=catalog_observations,
             active_search=working.get('active_search'),inbound_id=inbound_message_id,
             media_offer=port.offered_media,channel=channel)
     if direct_repair is not None:
@@ -379,7 +419,7 @@ def prepare_live_turn(db,scope,*,inbound_message_id,run_id):
         from .numbered_catalog import reconcile_catalog_delivery
         repair = None if material_now or booking_now or len(sources)>1 else reconcile_catalog_delivery(
             reply,buyer_message=buyer_message,search_batches=port.search_batches,menus=port.menus,
-            observations=result.tool_observations,active_search=working.get('active_search'),
+            observations=catalog_observations,active_search=working.get('active_search'),
             inbound_id=inbound_message_id,media_offer=port.offered_media,channel=channel)
         if repair is not None:
             candidate,menu=repair
@@ -407,6 +447,10 @@ def prepare_live_turn(db,scope,*,inbound_message_id,run_id):
     if detect(reply,names=scoped_names(project_view,lead_view,data.commercial),output=True).needs_reentry:
         raise ProductionToolError('Reply requires language reconciliation before dispatch.')
     working.pop('_active_source_message_id',None)
+    # Persist actual domain calls as well as SDK calls. No invented execution;
+    # the evaluator distinguishes pre/post-domain calls from SDK traces.
+    result=replace(result,tool_observations=(port.domain_observations[:pre_domain_count]+result.tool_observations+
+                                            port.domain_observations[pre_domain_count:])[-50:])
     turn=P04PreparedTurn(prepared=PreparedHermesTurn(scope=scope,inbound_message_id=inbound_message_id,
         expected_revision=loaded.revision,result=replace(result,reply=reply),proposed_state=working),
         proposed_menus=deepcopy(port.menus),presented_media_offer=deepcopy(port.offered_media))

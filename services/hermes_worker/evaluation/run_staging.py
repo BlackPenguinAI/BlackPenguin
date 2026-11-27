@@ -15,6 +15,7 @@ import tempfile
 from xml.etree import ElementTree as ET
 from run_lane import sdk_revision
 from diagnostics import parse_trace
+from lifecycle_evidence import parse_lifecycle
 from staging_scenarios import CASE_IDS, CHECKPOINTS
 
 TRANSPORT = ('test_closed_gate_and_auth','test_unknown_job_and_invalid_run',
@@ -48,6 +49,7 @@ def summarize(path, lane):
         if lane=='model' and status=='PASS' and (not complete or trace_status!='RECORDED'):status='INCOMPLETE'
         found[identity]={'case':identity,'status':status,'last_checkpoint':codes[-1] if safe and codes else None,
                          'trace_status':trace_status,'events':events}
+        if lane=='model':found[identity]['lifecycle']=parse_lifecycle(case)
     missing=sorted(set(expected.values())-set(found))
     result={'expected':len(expected),'total':len(cases),'passed':sum(x['status']=='PASS' for x in found.values()),
             'failed':sum(x['status']=='FAIL' for x in found.values()),'skipped':sum(x['status']=='SKIP' for x in found.values()),

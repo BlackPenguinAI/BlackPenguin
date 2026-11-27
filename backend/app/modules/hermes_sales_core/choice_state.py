@@ -14,6 +14,14 @@ def record_delivered_menu(state: dict, *, menu: dict, outbound_message_id: str) 
     if len(menu.get('options') or []) < 2:
         raise ValueError('A selectable menu requires at least two actual options')
     recorded = contextual_choices.menu_record(menu, reply_message_id=outbound_message_id)
+    # Live delivery already verified this scoped commercial label against the
+    # actual text. Preserve it for the next turn's identical visible_menu proof.
+    # The internal unit_id remains the only identifier used for operations.
+    if menu.get('type') in {'visit_day', 'visit_time'} and 'display_name' in menu:
+        from .commercial_delivery import clean_label
+        if not clean_label(menu['display_name']):
+            raise ValueError('Invalid verified visit display name')
+        recorded['display_name'] = menu['display_name']
     state['last_presented_choice_set'] = deepcopy(recorded)
     state['choice_set_initialized'] = True
     return recorded

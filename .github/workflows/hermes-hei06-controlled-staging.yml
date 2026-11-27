@@ -65,11 +65,11 @@ jobs:
             -v "$GITHUB_WORKSPACE/services/hermes_worker/evaluation:/opt/evaluation:ro" \
             -v "$GITHUB_WORKSPACE/evidence-controlled:/evidence" --entrypoint python "$HEI06_IMAGE" \
             /opt/evaluation/probe_private_network.py --commit "$GITHUB_SHA" --output /evidence/private-network.json
-      - name: Commercial delivery parity regression (22 focused cases)
+      - name: Commercial delivery and demo turn lifecycle (45 focused cases + 3 evidence checks)
         run: |
           docker run --rm --network none --env-file "$RUNNER_TEMP/hei06-controlled.env" \
             -v "$GITHUB_WORKSPACE/services/hermes_worker/evaluation:/opt/evaluation:ro" \
-            --entrypoint python "$HEI06_IMAGE" -m pytest -q --disable-warnings /opt/evaluation/test_commercial_delivery.py
+            --entrypoint python "$HEI06_IMAGE" -m pytest -q --disable-warnings /opt/evaluation/test_commercial_delivery.py /opt/evaluation/test_turn_lifecycle.py /opt/evaluation/test_lifecycle_evidence.py
       - name: Actual socket worker and expanded offline scenario harness (22 cases)
         run: |
           docker run --rm --network none --env-file "$RUNNER_TEMP/hei06-controlled.env" \
@@ -77,6 +77,12 @@ jobs:
             -v "$GITHUB_WORKSPACE/services/hermes_worker/evaluation:/opt/evaluation:ro" \
             -v "$GITHUB_WORKSPACE/evidence-controlled:/evidence" --entrypoint python "$HEI06_IMAGE" \
             /opt/evaluation/run_staging.py --lane offline --commit "$GITHUB_SHA" --output /evidence/offline.json
+      - name: Imperfect SDK lifecycle over private HTTP (9 integration cases)
+        run: |
+          docker run --rm --network none --env-file "$RUNNER_TEMP/hei06-controlled.env" \
+            -v "$GITHUB_WORKSPACE/backend/tests:/opt/bp-tests:ro" \
+            -v "$GITHUB_WORKSPACE/services/hermes_worker/evaluation:/opt/evaluation:ro" \
+            --entrypoint python "$HEI06_IMAGE" -m pytest -q --disable-warnings --show-capture=no --tb=short /opt/evaluation/test_turn_lifecycle_harness.py
       - name: Evidence exporter and comparison checks (9 cases)
         run: |
           docker run --rm --network none --env-file "$RUNNER_TEMP/hei06-controlled.env" \
