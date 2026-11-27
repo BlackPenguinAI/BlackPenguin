@@ -14,6 +14,10 @@ on:
         description: "Run HEI-06A.2b.3 continuous staging API worker (simulated providers)"
         type: boolean
         default: false
+      run_provider_isolation:
+        description: "Run HEI-06B.1 signed HTTPS quarantine and provider isolation (no real provider calls)"
+        type: boolean
+        default: false
       run_openrouter:
         description: "Run real SDK (requires one selected acceptance lane)"
         type: boolean
@@ -73,6 +77,9 @@ jobs:
               transform(name,(Path('backend')/name).read_bytes())
           print('All certified native overlay anchors compile before Docker build.')
           PY
+          fi
+          if test "${{ inputs.run_provider_isolation }}" = true; then
+            PYTHONPATH=services/hermes_worker/persistent_staging python3 -c 'from permanent import verify_checkout,head; verify_checkout(head())'
           fi
           python3 -m unittest discover -s services/hermes_worker/persistent_staging -p 'test_*.py' -v
       - name: Start independent persistent topology
@@ -137,6 +144,12 @@ jobs:
             args+=(--model)
           fi
           python3 services/hermes_worker/persistent_staging/continuous_acceptance.py "$RUNNER_TEMP/hei06a2-state" "${args[@]}" | tee "$RUNNER_TEMP/hei06a2-evidence/continuous-worker.json"
+      - name: HEI-06B.1 signed HTTPS quarantine and provider isolation
+        if: inputs.run_provider_isolation
+        shell: bash
+        run: |
+          set -euo pipefail
+          PYTHONPATH=services/hermes_worker/persistent_staging python3 -m provider_isolation.acceptance "$RUNNER_TEMP/hei06a2-state" | tee "$RUNNER_TEMP/hei06a2-evidence/provider-isolation.json"
       - name: Confirm persistence and clean hosted CI only
         shell: bash
         run: |
@@ -158,7 +171,9 @@ jobs:
           continuous=json.loads((p/'continuous-worker.json').read_text()) if (p/'continuous-worker.json').exists() else {}
           assert not continuous or (continuous['status']=='PASS' and continuous['continuous_api_worker_authorization']=='PASS' and all(continuous['checks'].values()))
           assert '${{ inputs.run_continuous }}' != 'true' or bool(continuous)
-          (p/'summary.json').write_text(json.dumps({'status':'PASS','candidate_commit':a['candidate_commit'],'published_policy_preserved':True,'scoped_simulation_authorization':scoped.get('status','NOT_RUN'),'real_inference':scoped.get('real_inference','NOT_RUN'),'scoped_one_shot_live_worker':live.get('one_shot_live_worker','NOT_RUN'),'live_worker_real_inference':live.get('real_inference','NOT_RUN'),'continuous_api_worker_authorization':continuous.get('continuous_api_worker_authorization','NOT_RUN'),'continuous_worker_real_inference':continuous.get('real_inference','NOT_RUN'),'live_staging_authorization':'NOT_RUN','real_provider_acceptance':'NOT_RUN','production_readiness':'CLOSED'},indent=2)+'\n')
+          provider=json.loads((p/'provider-isolation.json').read_text()) if (p/'provider-isolation.json').exists() else {}
+          assert '${{ inputs.run_provider_isolation }}' != 'true' or (provider.get('status')=='PASS' and all(provider['checks'].values()))
+          (p/'summary.json').write_text(json.dumps({'status':'PASS','candidate_commit':a['candidate_commit'],'published_policy_preserved':True,'scoped_simulation_authorization':scoped.get('status','NOT_RUN'),'real_inference':scoped.get('real_inference','NOT_RUN'),'scoped_one_shot_live_worker':live.get('one_shot_live_worker','NOT_RUN'),'live_worker_real_inference':live.get('real_inference','NOT_RUN'),'continuous_api_worker_authorization':continuous.get('continuous_api_worker_authorization','NOT_RUN'),'continuous_worker_real_inference':continuous.get('real_inference','NOT_RUN'),'provider_isolation':provider.get('status','NOT_RUN'),'permanent_server_deployment':'NOT_RUN','live_staging_authorization':'NOT_RUN','real_provider_acceptance':'NOT_RUN','production_readiness':'CLOSED'},indent=2)+'\n')
           PY
       - name: Capture sanitized startup evidence before cleanup
         if: failure()
@@ -212,5 +227,11 @@ jobs:
           PY
           else
             echo '- Continuous API worker: NOT_RUN.' >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if test -f "$RUNNER_TEMP/hei06a2-evidence/provider-isolation.json"; then
+            python3 - "$RUNNER_TEMP/hei06a2-evidence/provider-isolation.json" <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json,sys
+          r=json.load(open(sys.argv[1])); print('- HEI-06B.1 HTTPS quarantine: '+r['status']+'; actual Telnyx delivery: NOT_RUN; permanent server: NOT_RUN.')
+          PY
           fi
           echo '- Production readiness: CLOSED.'  >> "$GITHUB_STEP_SUMMARY"

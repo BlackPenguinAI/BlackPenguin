@@ -1,0 +1,28 @@
+# Separate Docker project/network. Never attach this service to BP's network.
+services:
+  receiver:
+    image: bp-hei06b1-quarantine:${STAGE_COMMIT:?required}
+    build: .
+    user: '10001:10001'
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 64
+    mem_limit: 128m
+    tmpfs: ['/tmp:rw,noexec,nosuid,nodev,mode=1777,size=4194304']
+    ports: ['${HEI06B_BIND:?required}:${HEI06B_PORT:?required}:8443']
+    volumes:
+      - ${HEI06B_CONFIG:?required}/policy.json:/config/policy.json:ro
+      - ${HEI06B_CONFIG:?required}/fullchain.pem:/tls/fullchain.pem:ro
+      - ${HEI06B_CONFIG:?required}/privkey.pem:/tls/privkey.pem:ro
+      - ${HEI06B_CONFIG:?required}/journal:/journal:rw
+    healthcheck:
+      # Local readiness only. Public certificate trust/hostname is checked externally.
+      test: ['CMD','python','-c','import http.client,ssl; c=http.client.HTTPSConnection("127.0.0.1",8443,context=ssl._create_unverified_context(),timeout=3); c.request("GET","/"); assert c.getresponse().status==404; c.close()']
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    networks: [quarantine]
+networks:
+  quarantine: {}

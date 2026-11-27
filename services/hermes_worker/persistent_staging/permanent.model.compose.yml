@@ -1,0 +1,6 @@
+# Only the SDK gets outbound network access. No messaging or Calendar keys.
+services:
+  bp-hermes:
+    networks: [private, model_egress]
+networks:
+  model_egress: {}
