@@ -175,9 +175,10 @@ def _live_port(db,snapshot,working,inbound,holds):
             try:
                 from .commercial_delivery import replay_visit_choice
                 resolved=replay_visit_choice(self,name,arguments)
+                from .material_continuity import redact
                 if resolved is not None:
-                    return resolved
-                return super().invoke(name,arguments,scope)
+                    return redact(resolved)
+                return redact(super().invoke(name,arguments,scope))
             finally:
                 # Draft tools only read; release any read/asset lock between calls.
                 db.rollback()
@@ -237,17 +238,34 @@ def _live_port(db,snapshot,working,inbound,holds):
             result=super()._assets(args)
             if result.get('ok'):
                 self.semantic_media_discovery=deepcopy(result.get('assets_by_subject') or {})
+                self.semantic_media_property_name=result.get('display_name')
             return result
 
         def _media_request(self,args):
             from .conversation_parity import media_tags
             from .live_multi_material import draft_multi_material
             if len(media_tags(self.message))>1:
-                return draft_multi_material(self,args)
-            from .semantic_material import discover
-            prior_offers=deepcopy(self.state.get('offered_assets') or {})
-            outcome=super()._media_request(args)
-            return discover(self,args,outcome,prior_offers,explicit_tags=media_tags(self.message))
+                outcome=draft_multi_material(self,args)
+            else:
+                from .semantic_material import discover
+                prior_offers=deepcopy(self.state.get('offered_assets') or {})
+                outcome=super()._media_request(args)
+                outcome=discover(self,args,outcome,prior_offers,explicit_tags=media_tags(self.message))
+            if outcome.get('delivery')=='pending_backend_share':
+                from .material_continuity import MATERIALS
+                from .conversation_parity import display_name
+                draft=(self.state.get('offered_assets') or {}).get('pending_request') or {}
+                found=self.discovered.get(draft.get('unit_id'))
+                if found:
+                    row,verified=found
+                    requested=set(draft.get('subjects') or [draft.get('subject')])
+                    outcome={**outcome,'display_name':display_name(row),
+                        'other_available':{k:v for k,v in verified.items() if k not in requested},
+                        'next_action':('Write a natural delivery message with '+MATERIALS+
+                            ' on its own line for the backend to insert the verified links. '
+                            'Use the property name. Optionally offer one useful verified next step. '
+                            'Do not claim delivery or another operation succeeded yet.')}
+            return outcome
 
         def _cancel_request(self,args):
             from .live_changes import draft_change
@@ -367,7 +385,13 @@ def prepare_live_turn(db,scope,*,inbound_message_id,run_id):
                 'Use this result to answer. A selected day needs a time; a selected time is not booking consent. '
                 'Do not repeat or replace this choice or claim a visit is booked.')}
     pre_domain_count=len(port.domain_observations)
-    from .semantic_material import safe_read_only_fallback
+    from .material_continuity import (GUIDANCE as material_guidance, MATERIALS, redact,
+        has_private_link, composition, continuation_question, REDACTED, shared_materials)
+    context['material_delivery_guidance']=material_guidance
+    context['shared_materials']=shared_materials(working.get('shared_media'),data.commercial.get('available_assets') or [])
+    # Preserve original scoped history for receipt/consent checks above; only
+    # the projection sent to the SDK is redacted.
+    from .semantic_material import safe_read_only_fallback, read_only_recovery_allowed
     from .sdk_diagnostics import evidence as sdk_failure_evidence
     import logging
     log=logging.getLogger(__name__)
@@ -377,7 +401,8 @@ def prepare_live_turn(db,scope,*,inbound_message_id,run_id):
     try:
         result=HermesSalesRuntime(settings,port,state_draft_tools=frozenset({'update_search_preferences'}),
             operational_draft_tools=LIVE_DRAFT_TOOLS,enabled_tools=enabled).process_turn(TurnRequest(
-                scope=scope,message=buyer_message,history=history,verified_context=context,channel=channel))
+                scope=scope,message=redact(buyer_message),history=redact(history),
+                verified_context=redact(context),channel=channel))
     except RuntimeError as exc:
         # The pinned SDK wrapper has this exact contract for absent text.
         # No broad provider, authorization or internal exception recovery.
@@ -405,7 +430,16 @@ def prepare_live_turn(db,scope,*,inbound_message_id,run_id):
     canonical_search_reply=False
     if material_now and booking_now:
         raise ProductionToolError('Concurrent commercial effects need separate turns.')
-    if material_now:reply='I found a matching resource. Let me get it for you.'
+    material_copy=None
+    if material_now:
+        # Preserve the model's composition for the native material batch only.
+        # Never include the marker or claim that an unissued share was sent in
+        # the provisional receipt. Existing native authorization stays intact.
+        template=composition(reply)
+        question=continuation_question(reply)
+        material_copy={'template':template,'question':question}
+        port.offered_media=None  # an offer not in the provisional text is not consent evidence
+        reply='I found a matching resource. Let me get it for you.'
     elif booking_now:
         reply={'cancel':'I will check your cancellation. Your visit is not cancelled yet.',
                'reschedule':'I will check the replacement. Your original visit is unchanged for now.'}.get(booking.get('kind'),'I will check whether your selected visit can be confirmed. It is not booked yet.')
@@ -432,6 +466,51 @@ def prepare_live_turn(db,scope,*,inbound_message_id,run_id):
     from app.modules.sales_agent.monetary_policy import validate_monetary_reply
     from app.modules.sales_agent.language_policy import detect,scoped_names
     db.info['hermes_sdk_checkpoint']='validate_reply'
+    if material_now and material_copy:
+        from .conversation_parity import media_tags, named_rows
+        from app.modules.sales_agent.response_policy import APPOINTMENT_TERMS
+        found=port.discovered.get(pending.get('unit_id'))
+        verified=found[1] if found else {}
+        def verified_copy(text):
+            if not text:return None
+            candidate=render_channel_text(text,channel)
+            if not candidate:return None
+            prose=candidate.replace(MATERIALS,'').strip()
+            # The material lane cannot announce unrelated actions or a second
+            # property's materials. The model may ask about a future visit.
+            if MATERIALS in candidate and APPOINTMENT_TERMS.search(candidate.split(MATERIALS,1)[0]):
+                return None
+            if any(row['reference']!=pending.get('unit_id') for row in named_rows(port._all_rows(),prose)):
+                return None
+            checked,proof=validate_monetary_reply(prose,data.commercial,lead_profile=lead_view.lead_profile_data)
+            if (checked!=prose or proof.get('replaced') or
+                    detect(prose,names=scoped_names(project_view,lead_view,data.commercial),output=True).needs_reentry or
+                    any(not verified.get(tag) for tag in media_tags(prose))):
+                return None
+            return candidate
+        template=composition(verified_copy(material_copy['template']))
+        question=continuation_question(verified_copy(material_copy['question']))
+        if template or question:
+            pending['commercial_copy']={'template':template,'question':question}
+    # A private bearer is never legal in an informational draft. Recover only
+    # with the existing read-only evidence contract; no model replay, resend,
+    # or removal of the durable coordinator's final security check.
+    if has_private_link(reply) or MATERIALS in reply or REDACTED in reply:
+        fallback=media_fallback()
+        if (fallback is None and 'list_unit_assets' in enabled and
+                read_only_recovery_allowed(port,loaded.data,sources=sources,primary_snapshot=primary_snapshot)):
+            # If the model echoed a prior link without a verified read, obtain
+            # metadata once through the existing scoped read port. No share is
+            # requested and the evidence is recorded as a domain read.
+            from .conversation_parity import focus_ref
+            if focus_ref(working) and not (working.get('conversation_focus') or {}).get('ambiguous'):
+                from .commercial_delivery import invoke_domain
+                invoke_domain(port,'list_unit_assets',{'unit_id':focus_ref(working)})
+                fallback=media_fallback()
+        if fallback is None:
+            raise ProductionToolError('Reply requires private material reference reconciliation.')
+        reply=fallback
+        log.warning('Hermes read-only recovery: private material reference')
     reply=render_channel_text(reply,channel)
     # Use the same persisted-profile monetary evidence as live_service._dispatch.
     # A canonical search reply must not depend on a preparation-only exemption.

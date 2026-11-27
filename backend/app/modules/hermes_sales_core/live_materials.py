@@ -15,7 +15,7 @@ from .engine_selection import HERMES, require_selectable
 from .production_tools import ProductionToolError, _hash
 
 
-def material_message(issued):
+def material_message(issued, commercial_copy=None):
     """Format exactly the opaque access URLs returned by the BP share service."""
     if not issued or len(issued)>20:
         raise ProductionToolError('Invalid material batch size.')
@@ -32,7 +32,8 @@ def material_message(issued):
         if '://' in name or '/projects/a/' in name:
             name='Document'
         lines.append(f'{i}. {name}\n{url}')
-    return '\n'.join(lines)
+    from .material_continuity import render_delivery
+    return render_delivery('\n'.join(lines),commercial_copy,resource_block='\n'.join(lines[1:]))
 
 
 def issue_live_material_batch(db,scope,*,inbound_message_id):
@@ -78,7 +79,7 @@ def issue_live_material_batch(db,scope,*,inbound_message_id):
             raise ProductionToolError('Share service returned a mismatched scope.')
         issued.append({'url':url,'name':binding['name']})
         entries.append({'share_id':share.id,'binding':deepcopy(binding)})
-    content=material_message(issued)
+    content=material_message(issued,draft.get('commercial_copy'))
     ids=[item['share_id'] for item in entries]
     if len(set(ids))!=len(ids):raise ProductionToolError('Share service returned duplicate IDs.')
     group_key='hermes:materials:'+run.id+':'+request_id

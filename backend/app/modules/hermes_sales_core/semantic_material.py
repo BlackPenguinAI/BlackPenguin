@@ -46,35 +46,47 @@ def discover(port, args, outcome, prior_offers, *, explicit_tags):
                             'if the current request does not authorize it.')}
 
 
-def fallback_reply(verified):
+def fallback_reply(verified, property_name=None):
     """Only used for a failed text response following verified read-only discovery."""
     labels = {'gallery_image': 'a photo gallery', 'brochure': 'a brochure',
               'floor_plan': 'a floor plan', 'unit_sheet': 'a fact sheet'}
     choices = [label for key, label in labels.items() if verified.get(key)]
+    from .material_continuity import has_private_link
+    name='this property'
+    if (isinstance(property_name,str) and 0<len(property_name.strip())<=100 and
+            '://' not in property_name and not has_private_link(property_name)):
+        name=' '.join(property_name.split())
     if not choices:
-        return "I couldn't find an approved material for this property right now. What other details would help?"
-    return 'The approved materials for this property include ' + ', '.join(choices) + '. Which would you like to see?'
+        return f"I couldn't find an approved material for {name} right now. What other details would help?"
+    return f'The approved materials for {name} include ' + ', '.join(choices) + '. Which would you like to see?'
 
 
-def safe_read_only_fallback(port, initial, *, sources, primary_snapshot):
+def read_only_recovery_allowed(port, initial, *, sources, primary_snapshot):
     """No repairs to visits, preferences, searches or pending external effects."""
-    if (getattr(port, 'semantic_media_discovery', None) is None or len(sources) != 1
-            or primary_snapshot is not None or port.search_batches or port.slot_batches
+    if (len(sources) != 1 or primary_snapshot is not None or port.search_batches or port.slot_batches
             or port.comparison_batches or port.menus or port.prepared_visit):
-        return None
+        return False
     state = port.state
     # Only focus and the turn-local evidence marker can legitimately change
     # during a material read. Fail closed for all other changes.
     ignored = {'conversation_focus', '_active_source_message_id', 'last_presented_choice_set',
                'choice_set_initialized', 'offered_assets'}
     if any(state.get(k) != initial.get(k) for k in set(state) | set(initial) if k not in ignored):
-        return None
+        return False
     pending = (state.get('offered_assets') or {}).get('pending_request') or {}
+    # Even an unchanged pending external effect is not a recovery lane.
     if pending.get('source_inbound_message_id') == port.inbound_id:
+        return False
+    return True
+
+
+def safe_read_only_fallback(port, initial, *, sources, primary_snapshot):
+    if (getattr(port,'semantic_media_discovery',None) is None or not
+            read_only_recovery_allowed(port,initial,sources=sources,primary_snapshot=primary_snapshot)):
         return None
     # No hidden offer from an invalid model response can authorize a later turn.
     port.offered_media = None
-    return fallback_reply(port.semantic_media_discovery)
+    return fallback_reply(port.semantic_media_discovery,getattr(port,'semantic_media_property_name',None))
 
 
 def align_contextual_search(port, result):

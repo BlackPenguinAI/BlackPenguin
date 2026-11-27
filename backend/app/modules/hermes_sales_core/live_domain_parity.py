@@ -53,7 +53,14 @@ def contextual_bedrooms(message, prior_state, prior_reply=None):
         return {}
     n = int(accepted[1])
     if not re.search(rf'(?<!\d){n}\s*[- ]?\s*bedrooms?\b', prior_reply, re.I):
-        return {}
+        # An open invitation to adjust the bedroom count can be answered by
+        # the buyer naming the new count. Only the final, immediate question
+        # can supply this evidence; a specific different offer cannot.
+        invitation=re.split(r'(?<=[.!?])\s+|\n+',prior_reply.strip())[-1]
+        if (not invitation.endswith('?') or not _ALT.search(invitation)
+                or not re.search(r'\bdifferent number of bedrooms\b',invitation,re.I)
+                or re.search(r'\b\d+\s*[- ]?\s*bedrooms?\b',invitation,re.I)):
+            return {}
     return {'bedrooms': {'mode': 'preferred', 'preferred': n}}
 
 
