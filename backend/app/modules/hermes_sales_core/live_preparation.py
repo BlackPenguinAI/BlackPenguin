@@ -119,6 +119,7 @@ def _live_port(db,snapshot,working,inbound,holds):
             self.search_batches=[];self.slot_batches=[];self.comparison_batches=[]
             self.comparison_rows=[];self.comparison_details={};self.primary_captured=False
             self.prepared_visit=None;self.domain_observations=[]
+            self.semantic_media_discovery=None
             self.prior_visit_offer=deepcopy(working.get('last_slot_search'))
             self.prior_visit_draft=deepcopy(working.get('visit_draft'))
 
@@ -189,6 +190,8 @@ def _live_port(db,snapshot,working,inbound,holds):
             args=strict_search_bounds(self.message,args)
             result=super()._search(args)
             if result.get('ok'):
+                from .semantic_material import align_contextual_search
+                result=align_contextual_search(self,result)
                 # Exact, turn-local copies from the authorized port, not the
                 # SDK's proposed text. No extra DB writes or retained history.
                 self.search_batches.append({'rows':deepcopy(self.search_rows),
@@ -230,12 +233,21 @@ def _live_port(db,snapshot,working,inbound,holds):
                 outcome['next_action']='Ask for explicit confirmation of exact property reference, date, HH:MM, timezone and visit address.'
             return outcome
 
+        def _assets(self,args):
+            result=super()._assets(args)
+            if result.get('ok'):
+                self.semantic_media_discovery=deepcopy(result.get('assets_by_subject') or {})
+            return result
+
         def _media_request(self,args):
             from .conversation_parity import media_tags
             from .live_multi_material import draft_multi_material
             if len(media_tags(self.message))>1:
                 return draft_multi_material(self,args)
-            return super()._media_request(args)
+            from .semantic_material import discover
+            prior_offers=deepcopy(self.state.get('offered_assets') or {})
+            outcome=super()._media_request(args)
+            return discover(self,args,outcome,prior_offers,explicit_tags=media_tags(self.message))
 
         def _cancel_request(self,args):
             from .live_changes import draft_change
@@ -253,6 +265,7 @@ def prepare_live_turn(db,scope,*,inbound_message_id,run_id):
     Requires a reserved live run and current policy. No second model. The
     caller owns transaction lifetime and must release it before dispatch.
     """
+    db.info['hermes_sdk_checkpoint']='load_context'
     require_selectable(HERMES)
     from .bp_context import build_bp_snapshot
     from .bp_state_store import load
@@ -260,7 +273,7 @@ def prepare_live_turn(db,scope,*,inbound_message_id,run_id):
     from .bp_p04_turn import P04PreparedTurn
     from .conversation_parity import scoped_dialogue,invalidate_stale_choice
     from .config import HermesSettings
-    from .contracts import TurnRequest
+    from .contracts import TurnRequest, TurnResult
     from .runtime import HermesSalesRuntime
     from .staff_config import snapshot as staff_snapshot
     from .staged_runtime import _policy
@@ -326,6 +339,7 @@ def prepare_live_turn(db,scope,*,inbound_message_id,run_id):
     db.commit()  # no row lock or open transaction during LLM inference
     from .commercial_delivery import (primary_declaration,primary_ack,search_reply,visit_reply,compare_reply,
         capture_primary,prepare_visit_choice,ensure_search,safe_visit_tools)
+    db.info['hermes_sdk_checkpoint']='prepare_context'
     primary_snapshot=None
     if len(sources)==1:
         # Demo begin_turn: capture only explicit self-declarations and resolve
@@ -353,9 +367,27 @@ def prepare_live_turn(db,scope,*,inbound_message_id,run_id):
                 'Use this result to answer. A selected day needs a time; a selected time is not booking consent. '
                 'Do not repeat or replace this choice or claim a visit is booked.')}
     pre_domain_count=len(port.domain_observations)
-    result=HermesSalesRuntime(settings,port,state_draft_tools=frozenset({'update_search_preferences'}),
-        operational_draft_tools=LIVE_DRAFT_TOOLS,enabled_tools=enabled).process_turn(TurnRequest(
-            scope=scope,message=buyer_message,history=history,verified_context=context,channel=channel))
+    from .semantic_material import safe_read_only_fallback
+    from .sdk_diagnostics import evidence as sdk_failure_evidence
+    import logging
+    log=logging.getLogger(__name__)
+    def media_fallback():
+        return safe_read_only_fallback(port,loaded.data,sources=sources,primary_snapshot=primary_snapshot)
+    db.info['hermes_sdk_checkpoint']='hermes_inference'
+    try:
+        result=HermesSalesRuntime(settings,port,state_draft_tools=frozenset({'update_search_preferences'}),
+            operational_draft_tools=LIVE_DRAFT_TOOLS,enabled_tools=enabled).process_turn(TurnRequest(
+                scope=scope,message=buyer_message,history=history,verified_context=context,channel=channel))
+    except RuntimeError as exc:
+        # The pinned SDK wrapper has this exact contract for absent text.
+        # No broad provider, authorization or internal exception recovery.
+        fallback=media_fallback() if str(exc)=='Hermes did not provide a text response' else None
+        if fallback is None:
+            raise
+        log.warning('Hermes read-only recovery: %s',sdk_failure_evidence(exc,'hermes_inference'))
+        # SDK observations were not returned; do not fabricate a tool trace.
+        result=TurnResult(reply=fallback,history=[],tool_observations=[])
+    db.info['hermes_sdk_checkpoint']='finalize_domain_reply'
     if primary_snapshot is not None and working.get('search_preferences')!=primary_snapshot:
         raise ProductionToolError('Explicit preference draft changed after inference.')
     # Recover a missing/wrong unambiguous search only through the authorized
@@ -373,7 +405,7 @@ def prepare_live_turn(db,scope,*,inbound_message_id,run_id):
     canonical_search_reply=False
     if material_now and booking_now:
         raise ProductionToolError('Concurrent commercial effects need separate turns.')
-    if material_now:reply='I found the requested material. I still need to validate the share before sending it.'
+    if material_now:reply='I found a matching resource. Let me get it for you.'
     elif booking_now:
         reply={'cancel':'I will check your cancellation. Your visit is not cancelled yet.',
                'reschedule':'I will check the replacement. Your original visit is unchanged for now.'}.get(booking.get('kind'),'I will check whether your selected visit can be confirmed. It is not booked yet.')
@@ -399,6 +431,7 @@ def prepare_live_turn(db,scope,*,inbound_message_id,run_id):
     from app.modules.sales_agent.response_policy import render_channel_text,split_channel_text
     from app.modules.sales_agent.monetary_policy import validate_monetary_reply
     from app.modules.sales_agent.language_policy import detect,scoped_names
+    db.info['hermes_sdk_checkpoint']='validate_reply'
     reply=render_channel_text(reply,channel)
     # Use the same persisted-profile monetary evidence as live_service._dispatch.
     # A canonical search reply must not depend on a preparation-only exemption.
@@ -449,6 +482,10 @@ def prepare_live_turn(db,scope,*,inbound_message_id,run_id):
                 if candidate is None:
                     candidate=primary_ack(port,result.tool_observations)
             if candidate is None:
+                candidate=media_fallback()
+                if candidate is not None:
+                    log.warning('Hermes read-only recovery: monetary validation')
+            if candidate is None:
                 raise ProductionToolError('Reply requires monetary reconciliation before dispatch.')
             candidate=render_channel_text(candidate,channel)
             # A newly declared preference is persisted after delivery. Do not
@@ -458,7 +495,16 @@ def prepare_live_turn(db,scope,*,inbound_message_id,run_id):
                 raise ProductionToolError('Reply requires monetary reconciliation before dispatch.')
             reply=candidate
     if detect(reply,names=scoped_names(project_view,lead_view,data.commercial),output=True).needs_reentry:
-        raise ProductionToolError('Reply requires language reconciliation before dispatch.')
+        fallback=media_fallback()
+        if fallback is None:
+            raise ProductionToolError('Reply requires language reconciliation before dispatch.')
+        candidate=render_channel_text(fallback,channel)
+        checked,evidence_check=validate_monetary_reply(candidate,data.commercial,lead_profile=lead_view.lead_profile_data)
+        if (checked!=candidate or evidence_check.get('replaced')
+                or detect(candidate,names=scoped_names(project_view,lead_view,data.commercial),output=True).needs_reentry):
+            raise ProductionToolError('Reply requires language reconciliation before dispatch.')
+        log.warning('Hermes read-only recovery: language validation')
+        reply=candidate
     working.pop('_active_source_message_id',None)
     # Persist actual domain calls as well as SDK calls. No invented execution;
     # the evaluator distinguishes pre/post-domain calls from SDK traces.
@@ -467,6 +513,7 @@ def prepare_live_turn(db,scope,*,inbound_message_id,run_id):
     turn=P04PreparedTurn(prepared=PreparedHermesTurn(scope=scope,inbound_message_id=inbound_message_id,
         expected_revision=loaded.revision,result=replace(result,reply=reply),proposed_state=working),
         proposed_menus=deepcopy(port.menus),presented_media_offer=deepcopy(port.offered_media))
+    db.info['hermes_sdk_checkpoint']='validate_reply_parts'
     from .multipart_reply import reply_parts
     reply_parts(turn,channel)
     return turn

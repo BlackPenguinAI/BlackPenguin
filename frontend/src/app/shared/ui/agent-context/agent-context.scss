@@ -6,3 +6,8 @@
 .execution > div { display: grid; grid-template-columns: 1fr; gap: .1rem; }
 .execution dt { font-weight: 600; }
 .execution dd { margin: 0; overflow-wrap: anywhere; }
+
+/* Keep the action readable inside a narrow conversation sidebar. */
+.context > header > div { min-width: 0; flex: 1 1 120px; }
+.context > header > button { flex: 0 0 auto; white-space: nowrap; overflow-wrap: normal; }
+@container(max-width:300px) { .context > header { flex-wrap: wrap; } }

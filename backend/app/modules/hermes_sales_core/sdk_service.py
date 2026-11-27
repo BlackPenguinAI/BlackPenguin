@@ -7,6 +7,8 @@ worker owns every real effect. The private runtime requires a claimed, pinned li
 """
 from __future__ import annotations
 import hmac
+import json
+import logging
 import os
 import threading
 
@@ -15,6 +17,8 @@ from pydantic import BaseModel, ConfigDict, Field
 
 app=FastAPI(title='Hermes internal preparation',docs_url=None,redoc_url=None,openapi_url=None)
 _PREPARE_LOCK=threading.Lock()
+logger=logging.getLogger(__name__)
+from .sdk_diagnostics import HEADER, BUSY_DETAIL, REVIEW_DETAIL, evidence
 
 
 class PrepareRequest(BaseModel):
@@ -46,6 +50,7 @@ def _prepare_reserved(db,request):
     from .live_preparation import reserve_live_run,prepare_live_turn
     from .live_coordinator import persist_live_draft,restore_draft
     from .production_tools import ProductionToolError
+    db.info['hermes_sdk_checkpoint']='reserve_run'
     require_selectable(HERMES)
     job,scope,conversation,lead,inbound=lock_job(db,request.job_id)
     inbound_id=inbound.id
@@ -59,11 +64,14 @@ def _prepare_reserved(db,request):
     if run.output_snapshot:
         raise ProductionToolError('Unexpected run state.')
     db.commit()
+    db.info['hermes_sdk_checkpoint']='prepare_live_turn'
     turn=prepare_live_turn(db,scope,inbound_message_id=inbound_id,run_id=request.run_id)
     # Recheck the claimed job after inference; new inbound / takeover must win.
+    db.info['hermes_sdk_checkpoint']='recheck_claim'
     job,actual,conversation,lead,inbound=lock_job(db,request.job_id)
     if actual!=scope or inbound.id!=inbound_id:
         raise ProductionToolError('Job was superseded while preparing.')
+    db.info['hermes_sdk_checkpoint']='persist_live_draft'
     persist_live_draft(db,scope,inbound_message_id=inbound_id,run_id=request.run_id,turn=turn)
     db.commit()
     return {'run_id':request.run_id,'status':'draft_ready'}
@@ -88,13 +96,15 @@ def prepare(request: PrepareRequest, authorization: str | None=Header(default=No
     # cross-process job leases are certified. Never queue requests behind an
     # unbounded SDK call; caller will preserve the existing event for review.
     if not _PREPARE_LOCK.acquire(blocking=False):
-        raise HTTPException(409,'Hermes preparation is busy.')
+        raise HTTPException(409,BUSY_DETAIL)
     try:
         db=bounded(SessionLocal())
         try:return prepare_reserved(db,request)
-        except Exception:
+        except Exception as exc:
+            diagnostic=evidence(exc,db.info.get('hermes_sdk_checkpoint','authorize_reserved'))
+            logger.warning('Hermes SDK preparation failed: %s',diagnostic)
             db.rollback()
-            raise HTTPException(409,'Hermes preparation requires review.') from None
+            raise HTTPException(409,REVIEW_DETAIL,headers={HEADER:json.dumps(diagnostic,separators=(',',':'))}) from None
         finally:db.close()
     finally:_PREPARE_LOCK.release()
 

@@ -19,6 +19,7 @@ from .provider_delivery import (ENGINE, CONTROL_ENGINE, STOP_REPLY, HANDOFF_REPL
 
 SDK_URL = 'http://bp-hermes:8080/internal/prepare'
 MAX_RECEIPT_ATTEMPTS = 10
+MAX_SDK_BUSY_ATTEMPTS = 5
 logger = logging.getLogger(__name__)
 
 
@@ -26,9 +27,16 @@ def now():
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
+class SDKPreparationError(ProductionToolError):
+    def __init__(self, diagnostic):
+        super().__init__('Private Hermes preparation failed.')
+        self.diagnostic=diagnostic
+
+
 async def request_sdk_draft(job_id, run_id):
-    """Fixed private origin, no redirects or proxy, IDs only, bounded timeout."""
+    """Fixed private origin; a busy response is safe to retry, others are not."""
     import httpx
+    from .sdk_diagnostics import response_failure
     token=os.environ.get('HERMES_INTERNAL_TOKEN','')
     if len(token)<32:
         raise ProductionToolError('Private Hermes transport is not configured.')
@@ -36,7 +44,7 @@ async def request_sdk_draft(job_id, run_id):
         response=await client.post(SDK_URL,json={'job_id':job_id,'run_id':run_id},
             headers={'Authorization':'Bearer '+token})
         if response.status_code!=200:
-            raise ProductionToolError('Private Hermes preparation failed.')
+            raise SDKPreparationError(response_failure(response))
         data=response.json()
     if data!={'run_id':run_id,'status':'draft_ready'}:
         raise ProductionToolError('Unexpected private Hermes preparation receipt.')
@@ -326,10 +334,12 @@ def failure_evidence(exc, checkpoint):
     sqlstate=getattr(getattr(exc,'orig',None),'pgcode',None) or getattr(getattr(exc,'orig',None),'sqlstate',None)
     if isinstance(sqlstate,str) and len(sqlstate)==5 and sqlstate.isalnum():
         result['sqlstate']=sqlstate
+    if isinstance(exc,SDKPreparationError):
+        result.update(exc.diagnostic)
     return result
 
 
-def mark_failure(db,job_id,*,pending=False,diagnostic=None):
+def mark_failure(db,job_id,*,pending=False,sdk_busy=False,diagnostic=None):
     """No provider retry on uncertain, rejected, partial or superseded effects."""
     from app.modules.sales_agent.models import SalesInboundJob,SalesMessage,SalesConversation
     db.rollback()
@@ -338,11 +348,12 @@ def mark_failure(db,job_id,*,pending=False,diagnostic=None):
     db.query(SalesConversation).filter_by(id=initial.conversation_id).with_for_update().first()
     job=db.query(SalesInboundJob).filter_by(id=job_id).populate_existing().with_for_update().one_or_none()
     if not job or job.status!='processing':return
-    waiting=pending and (job.attempt_number or 0)<MAX_RECEIPT_ATTEMPTS
+    attempts=job.attempt_number or 0
+    waiting=(pending and attempts<MAX_RECEIPT_ATTEMPTS) or (sdk_busy and attempts<MAX_SDK_BUSY_ATTEMPTS)
     job.status='retry' if waiting else 'review';job.claimed_at=None
-    job.scheduled_at=now()+timedelta(seconds=3 if waiting and (job.attempt_number or 0)<=3 else 30)
-    job.error_code='HERMES_PROVIDER_PENDING' if waiting else 'HERMES_RECONCILIATION_REQUIRED'
-    job.error_message='Waiting for the existing provider receipt.' if waiting else 'Hermes turn requires staff review; do not automatically resend.'
+    job.scheduled_at=now()+timedelta(seconds=3 if waiting and attempts<=3 else 30)
+    job.error_code=('HERMES_SDK_BUSY' if sdk_busy else 'HERMES_PROVIDER_PENDING') if waiting else 'HERMES_RECONCILIATION_REQUIRED'
+    job.error_message=('Waiting for the private Hermes preparation slot.' if sdk_busy else 'Waiting for the existing provider receipt.') if waiting else 'Hermes turn requires staff review; do not automatically resend.'
     if not waiting:job.processed_at=now()
     inbound=db.get(SalesMessage,job.message_id)
     if inbound:
@@ -364,6 +375,11 @@ async def process_hermes_inbound_job(job_id):
     except ReceiptPending as exc:
         evidence=failure_evidence(exc,db.info.get('hermes_checkpoint'))
         mark_failure(db,job_id,pending=True,diagnostic=evidence);return False
+    except SDKPreparationError as exc:
+        evidence=failure_evidence(exc,db.info.get('hermes_checkpoint'))
+        busy=(db.info.get('hermes_checkpoint')=='sdk_prepare' and exc.diagnostic.get('sdk_error_code')=='SDK_BUSY')
+        logger.warning('Hermes SDK preparation outcome: %s',evidence)
+        mark_failure(db,job_id,sdk_busy=busy,diagnostic=evidence);return False
     except Exception as exc:
         evidence=failure_evidence(exc,db.info.get('hermes_checkpoint'))
         logger.warning('Hermes inbound requires review: %s',evidence)
