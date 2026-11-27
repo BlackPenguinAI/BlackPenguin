@@ -88,4 +88,34 @@ class DatabaseContract(unittest.TestCase):
                     check_database(self.connection((DB_NAME,DB_NAME,'160008'),markers))
 
 
+class WorkerBootstrapContract(unittest.TestCase):
+    def test_registry_before_mapper_configuration(self):
+        import worker_probe
+        calls = []
+        def load(name):
+            calls.append(name)
+            return SimpleNamespace(configure_mappers=lambda: calls.append('configure_mappers'))
+        with patch.object(worker_probe, 'import_module', side_effect=load):
+            worker_probe.register_orm()
+        self.assertEqual(calls, ['app.db.base', 'sqlalchemy.orm', 'configure_mappers'])
+
+    def test_mapper_error_keeps_type_and_no_private_text(self):
+        import worker_probe
+        import json
+        error_class = type('InvalidRequestError', (Exception,), {})
+        source = "raise error_class('PRIVATE_PASSWORD_AND_URL')"
+        try:
+            exec(compile(source, '/opt/staging/worker_probe.py', 'exec'), {'error_class':error_class})
+        except error_class as exc:
+            result = worker_probe.failure_evidence(exc)
+        self.assertEqual(result, {'type':'InvalidRequestError',
+                                  'locations':[{'file':'worker_probe.py','line':1}]})
+        self.assertNotIn('PRIVATE_PASSWORD_AND_URL', json.dumps(result))
+
+    def test_unknown_exception_does_not_expose_name_or_message(self):
+        import worker_probe
+        result = worker_probe.failure_evidence(type('PrivateClassName', (Exception,), {})('private'))
+        self.assertEqual(result, {'type':'other_error','locations':[]})
+
+
 if __name__=='__main__':unittest.main()

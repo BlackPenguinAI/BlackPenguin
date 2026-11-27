@@ -8,6 +8,8 @@ import argparse
 import asyncio
 from datetime import datetime, timedelta, timezone
 from hashlib import sha256
+from importlib import import_module
+from traceback import walk_tb
 import json
 import os
 from pathlib import Path
@@ -15,6 +17,42 @@ import time
 from unittest.mock import patch
 from guard import (validate_environment, check_database, assert_scope, inference_count,
                    SCOPE, MESSAGE, POLICY_TOOLS)
+
+
+# Each Compose phase starts a fresh Python process. Import the canonical ORM
+# registry before the first ORM query, not merely in the seed process.
+def register_orm():
+    import_module('app.db.base')
+    import_module('sqlalchemy.orm').configure_mappers()
+
+
+_FAILURE_TYPES = frozenset({
+    'AssertionError', 'PermissionError', 'RuntimeError', 'ValueError',
+    'ProductionToolError', 'OperationalError', 'IntegrityError', 'HTTPException',
+    'ConnectError', 'ConnectTimeout', 'ReadTimeout', 'KeyError',
+    'ModuleNotFoundError', 'ImportError', 'InvalidRequestError',
+    'NoReferencedTableError', 'NoReferencedColumnError', 'UnmappedClassError',
+    'DetachedInstanceError', 'ProgrammingError', 'StatementError',
+    'PendingRollbackError', 'DataError', 'InterfaceError', 'DBAPIError',
+    'ArgumentError', 'AttributeError', 'TypeError', 'NameError', 'TimeoutError',
+})
+_FAILURE_FILES = frozenset({
+    'worker_probe.py', 'guard.py', 'live_worker.py', 'live_preparation.py',
+    'live_job.py', 'engine_router.py', 'live_coordinator.py', 'provider_delivery.py',
+    'bp_state_store.py', 'sdk_service.py', 'base.py', 'postgres.py',
+})
+
+
+def failure_evidence(exc):
+    """Allowlisted type and code locations only, never messages, source or locals."""
+    kind = type(exc).__name__
+    locations = []
+    for frame, line in walk_tb(exc.__traceback__):
+        filename = Path(frame.f_code.co_filename).name
+        if filename in _FAILURE_FILES:
+            locations.append({'file': filename, 'line': line})
+    return {'type': kind if kind in _FAILURE_TYPES else 'other_error',
+            'locations': locations[-8:]}
 
 
 def fingerprint(value):
@@ -120,10 +158,17 @@ def prepare(db, report):
     db.commit()
     report['checkpoint']='claim_job'
     assert _claim_inbound_jobs(limit=1) == ['job']
+    report['checks']['worker_claim'] = True
+    report['checkpoint']='claim_duplicate'
     assert _claim_inbound_jobs(limit=1) == []
+    report['checks']['no_duplicate_claim'] = True
+    report['checkpoint']='verify_claimed_scope'
     assert_scope(db, 'job')
+    report['checks']['claimed_scope_verified'] = True
+    report['checkpoint']='reserve_run'
     run = reserve_live_run(db, TurnScope(*SCOPE), inbound_message_id='inbound')
     run_id = run.id; db.commit()
+    report['checks']['reserved_policy'] = True
     report['checkpoint']='http_auth_and_binding'
     request_checks(run_id, report)
     assert inference_count(db) == 0 and db.query(AgentRun).count() == 1
@@ -231,7 +276,11 @@ def main():
         from app.db.postgres import engine, SessionLocal
         from app.modules.hermes_sales_core import engine_selection
         assert engine_selection.live_hermes_ready() is False
+        report['checkpoint']='database_identity'
         with engine.connect() as conn:check_database(conn)
+        report['checkpoint']='register_orm'
+        register_orm()
+        report['checks']['orm_registry_ready'] = True
         with SessionLocal() as db, patch.object(engine_selection,'live_hermes_ready',return_value=True):
             if args.phase=='seed':seed(db, engine, report)
             else:PHASES[args.phase](db,report)
@@ -239,10 +288,8 @@ def main():
         report['status']='PASS';report['checkpoint']='complete'
     except Exception as exc:
         # Never serialize raw exception text/traceback or model/provider data.
-        report['reason']=type(exc).__name__ if type(exc).__name__ in {
-            'AssertionError','PermissionError','RuntimeError','ValueError','ProductionToolError',
-            'OperationalError','IntegrityError','HTTPException','ConnectError','ReadTimeout',
-            'KeyError','ModuleNotFoundError','ImportError'} else 'other_error'
+        report['failure'] = failure_evidence(exc)
+        report['reason'] = report['failure']['type']
     finally:
         args.output.write_text(json.dumps(report,indent=2,sort_keys=True)+'\n',encoding='utf-8')
         print(json.dumps(report,sort_keys=True))

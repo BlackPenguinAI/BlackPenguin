@@ -78,3 +78,12 @@ Artifacts contain fixed check names, phase/checkpoint, exception class allowlist
 ## Next gate
 
 If offline and optional real-model combined lanes pass, record exact candidate SHA and reports. Complete the remaining HEI-06A provisioning/authorization design for actual provider staging before HEI-06B. See `HEI_06_REAL_PROVIDER_ACCEPTANCE.md`: dedicated staging PostgreSQL and policy, explicit scope allowlist and operator stop mechanism at enqueue/effect/dispatch, actual webhook verification, test-only recipients and separate Google test calendar. None of these real-provider requirements is marked passed by this package. Production readiness stays CLOSED; no LangGraph/Hermes selector change or fallback.
+
+
+## HEI-06A.1 — Worker bootstrap hotfix (candidate b2ea5da)
+
+[Private runtime #1](https://github.com/BlackPenguinAI/BlackPenguin/actions/runs/45969361816) passed seed and failed at `prepare/claim_job` with `other_error`. No private prepare/replay/finish or real model was reached. The source shows a cold-process initialization defect: only seed imported the complete `app.db.base` model registry. In separate worker processes this may leave SQLAlchemy relationship targets or foreign table definitions unresolved; the first ORM query can trigger mapper configuration. The exact CI exception is unavailable, so this is a supported hypothesis, not a confirmed traceback.
+
+The hotfix registers the canonical model registry and explicitly configures mappers after the database isolation check, before every phase. It does not create tables except in the original seed path, modify application code, change readiness, or bypass worker claim/reservation. It splits `claim_job`, `claim_duplicate`, `verify_claimed_scope`, and `reserve_run`, and includes a separate `register_orm` checkpoint. The sanitized report now includes allowlisted exception types and code file/line locations, without exception text or stack locals.
+
+Upload the three differential files preserving paths, commit `fix(hermes): initialize ORM in each private runtime probe`, and run the same HEI-06A workflow with `run_openrouter` disabled. Only after offline PASS run with `run_openrouter` enabled. The workflow and all original assertions are unchanged. Local tests cover the initialization sequence and safe failure projection; cross-container execution remains pending CI.
