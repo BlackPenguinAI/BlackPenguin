@@ -209,3 +209,83 @@ def test_direct_repair_diagnostic_does_not_return_row_content():
     audit={}
     assert reconcile_direct_catalog(REPLY,**args,audit=audit) is None
     assert audit['reasons']==['no_exact_criteria','row_filter_conflict']
+
+
+# HEI-06 demo responsibility parity. A failed read is not a successful search
+# and cannot authorize an effect, but its argument validation does not revoke
+# an earlier successful read. Both presentation paths consume the same rule.
+@pytest.mark.parametrize('code', ['INVALID_SEARCH','PERMANENT_SCOPE_REQUIRES_EVIDENCE','TOOL_ARGUMENT_INVALID'])
+@pytest.mark.parametrize('position', ['before','after'])
+def test_recoverable_search_error_does_not_erase_success(code,position):
+    from app.modules.hermes_sales_core.numbered_catalog import reconcile_direct_catalog, catalog_read_evidence
+    args=direct_args()
+    failure={'tool':'search_properties','status':'rejected','error_code':code}
+    args['observations'].insert(0 if position=='before' else len(args['observations']),failure)
+    before=deepcopy(args)
+    audit={}
+    reply,menu,search=reconcile_direct_catalog(REPLY,**args,audit=audit)
+    assert catalog_read_evidence(args['observations'])==(2,1)
+    assert args==before  # Never promote a rejected tool to executed.
+    assert [o['unit_id'] for o in menu['options']]==['oak','van']
+    assert search==args['search_batches'][0]['search']
+    assert 'recoverable_search_rejection' in audit['reasons']
+    assert 'starting price USD 340,000' in reply
+    # The general renderer also consumes the same successful read evidence.
+    assert repair(observations=args['observations']) is not None
+
+
+@pytest.mark.parametrize('code', ['GLOBAL_TOOL_DISABLED','PERMISSIONERROR','COMMERCIAL_POLICY_HOLD',
+    'P01_EFFECTS_DISABLED','DOMAIN_VALIDATION_REJECTED','unknown_error','VALUEERROR',None])
+def test_policy_unknown_or_uncertain_read_failures_are_not_recoverable(code):
+    from app.modules.hermes_sales_core.numbered_catalog import reconcile_direct_catalog
+    args=direct_args()
+    args['observations'].append({'tool':'search_properties','status':'rejected','error_code':code})
+    assert reconcile_direct_catalog(REPLY,**args) is None
+    assert repair(observations=args['observations']) is None
+
+
+def test_rejected_only_search_is_not_successful_evidence():
+    from app.modules.hermes_sales_core.numbered_catalog import reconcile_direct_catalog
+    args=direct_args(observations=[{'tool':'search_properties','status':'rejected','error_code':'INVALID_SEARCH'}])
+    assert reconcile_direct_catalog(REPLY,**args) is None
+    assert repair(observations=args['observations']) is None
+
+
+def latest_batch_args():
+    args=direct_args()
+    args['search_batches']=args['search_batches'][:1]
+    args['active_search']=deepcopy(args['search_batches'][0]['search'])
+    args['observations']=[{'tool':'search_properties','status':'executed','error_code':None},
+        {'tool':'search_properties','status':'rejected','error_code':'INVALID_SEARCH'}]
+    return args
+
+
+@pytest.mark.parametrize('buyer', [REQUEST,'Show me 3 bedroom homes under $350,000.'])
+def test_visible_menu_delivery_uses_successful_batch_not_failed_read(buyer):
+    from app.modules.hermes_sales_core.numbered_catalog import reconcile_catalog_delivery
+    from app.modules.sales_agent.monetary_policy import validate_monetary_reply
+    args=latest_batch_args();args['buyer_message']=buyer
+    # No proposed menu is needed when exact refs/order can be independently
+    # bound from the normalized reply and the actual successful search.
+    reply,menu=reconcile_catalog_delivery(REPLY,**args)
+    assert [o['unit_id'] for o in menu['options']]==['oak','van']
+    assert validate_monetary_reply(reply,COMMERCIAL)[0]==reply
+
+
+@pytest.mark.parametrize('mutation', ['ledger_count','foreign_source','active_mismatch','inventory',
+    'unapproved_ref','duplicate_ref','unverified_name','mixed_tool','mixed_request','media_offer','other_menu'])
+def test_live_delivery_rejects_unproved_or_mixed_evidence(mutation):
+    from app.modules.hermes_sales_core.numbered_catalog import reconcile_catalog_delivery
+    args=latest_batch_args();reply=REPLY
+    if mutation=='ledger_count':args['observations'].append({'tool':'search_properties','status':'executed'})
+    if mutation=='foreign_source':args['search_batches'][0]['search']['source_inbound_message_id']='foreign'
+    if mutation=='active_mismatch':args['active_search']['scope']='permanent'
+    if mutation=='inventory':args['search_batches'][0]['rows'][1]['availability_verified']=False
+    if mutation=='unapproved_ref':reply=reply.replace('Oakwood','Unknown house')
+    if mutation=='duplicate_ref':reply=reply.replace('Oakwood','Van Buren')
+    if mutation=='unverified_name':args['search_batches'][0]['rows'][1]['property_type']='Different house'
+    if mutation=='mixed_tool':args['observations'].append({'tool':'get_unit_media','status':'rejected','error_code':'INVALID_SEARCH'})
+    if mutation=='mixed_request':args['buyer_message']+=' Also send a brochure.'
+    if mutation=='media_offer':args['media_offer']={'unit_id':'van'}
+    if mutation=='other_menu':args['menus']=[{'type':'visit_day'}]
+    assert reconcile_catalog_delivery(reply,**args) is None

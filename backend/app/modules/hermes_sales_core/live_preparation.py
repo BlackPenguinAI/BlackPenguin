@@ -135,6 +135,18 @@ def _live_port(db,snapshot,working,inbound,holds):
                 # SDK's proposed text. No extra DB writes or retained history.
                 self.search_batches.append({'rows':deepcopy(self.search_rows),
                     'search':deepcopy(self.state.get('active_search'))})
+            else:
+                # Demo parity: the rejected search contributes no facts and
+                # remains rejected, but does not erase an earlier valid read.
+                from .numbered_catalog import RECOVERABLE_SEARCH_ERRORS
+                if (result.get('error_code') in RECOVERABLE_SEARCH_ERRORS
+                        and self.search_batches
+                        and self.state.get('active_search')==self.search_batches[-1]['search']):
+                    self.search_rows=deepcopy(self.search_batches[-1]['rows'])
+                    result={**result, 'next_action':(
+                        'This search was not executed. Reuse the earlier successful catalog '
+                        'result if it answers the buyer; correct the arguments only if needed. '
+                        'Do not change primary preferences or repeat an invalid search.')}
             return result
 
         def _verified_material(self,asset_id,row,requested_tag):
@@ -301,9 +313,9 @@ def prepare_live_turn(db,scope,*,inbound_message_id,run_id):
         # already verified numbered catalog search, reconstruct the displayed
         # subset/order from this turn's actual search result. Re-run the exact
         # same guard; do not accept its generic fallback or new LLM inference.
-        from .numbered_catalog import reconcile_numbered_catalog
-        repair = None if material_now or booking_now or len(sources)>1 else reconcile_numbered_catalog(
-            reply,buyer_message=buyer_message,search_rows=port.search_rows,menus=port.menus,
+        from .numbered_catalog import reconcile_catalog_delivery
+        repair = None if material_now or booking_now or len(sources)>1 else reconcile_catalog_delivery(
+            reply,buyer_message=buyer_message,search_batches=port.search_batches,menus=port.menus,
             observations=result.tool_observations,active_search=working.get('active_search'),
             inbound_id=inbound_message_id,media_offer=port.offered_media,channel=channel)
         if repair is None:

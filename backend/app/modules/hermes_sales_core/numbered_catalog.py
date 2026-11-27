@@ -19,6 +19,44 @@ _OTHER_REQUEST = re.compile(
 # change search_rows, menus, focus or drafts. Do not generalize this exception
 # to all read tools: some of those update conversational context.
 _RECONCILABLE_TOOLS = frozenset({'search_properties', 'get_project_overview'})
+# An unsuccessful read does not revoke evidence from an earlier successful
+# read. Only errors produced by the search argument/scope validator (before
+# changing state), or the SDK's argument-shape check, are recoverable here.
+# Permission, policy, transport and unknown errors are NOT recoverable.
+RECOVERABLE_SEARCH_ERRORS = frozenset({
+    'INVALID_SEARCH', 'PERMANENT_SCOPE_REQUIRES_EVIDENCE', 'TOOL_ARGUMENT_INVALID',
+})
+
+
+def catalog_read_evidence(observations):
+    """Count successful searches; distinguish argument errors from denials.
+
+    No rejected operation is promoted to success. A non-catalog tool or an
+    unclassified failure keeps presentation on the ordinary fail-closed path.
+    The actual successful results must independently come from the scoped port.
+    """
+    if not isinstance(observations, list) or not observations:
+        return None
+    successes = 0
+    rejected = 0
+    for observation in observations:
+        if not isinstance(observation, dict):
+            return None
+        tool = observation.get('tool')
+        status = observation.get('status')
+        code = observation.get('error_code')
+        if tool not in _RECONCILABLE_TOOLS:
+            return None
+        if status == 'executed' and code is None:
+            successes += tool == 'search_properties'
+        elif (tool == 'search_properties' and status == 'rejected'
+              and isinstance(code, str) and code in RECOVERABLE_SEARCH_ERRORS):
+            rejected += 1
+        else:
+            return None
+    return (successes, rejected) if successes else None
+
+
 _CURRENCIES = frozenset({'USD','MXN','PEN','EUR','COP','BRL','CLP','ARS','CAD','GBP'})
 
 
@@ -39,11 +77,7 @@ def reconcile_numbered_catalog(reply, *, buyer_message, search_rows, menus,
 
     if (not isinstance(buyer_message,str) or not search_request(buyer_message) or _OTHER_REQUEST.search(buyer_message)
             or requested_topics(buyer_message)-{'property_types','inventory','pricing'}
-            or media_offer or not observations
-            or any(not isinstance(o,dict) or o.get('tool') not in _RECONCILABLE_TOOLS
-                   or o.get('status')!='executed' or o.get('error_code') is not None
-                   for o in observations)
-            or not any(o.get('tool')=='search_properties' for o in observations)):
+            or media_offer or catalog_read_evidence(observations) is None):
         return None
     if (not isinstance(active_search,dict) or active_search.get('source_inbound_message_id')!=inbound_id
             or not isinstance(search_rows,list) or len(menus)!=1 or menus[0].get('type')!='property'):
@@ -138,18 +172,18 @@ def reconcile_direct_catalog(reply, *, buyer_message, search_batches, menus,
         if audit is not None and code not in audit.setdefault('reasons',[]):
             audit['reasons'].append(code)
 
+    evidence = catalog_read_evidence(observations)
     if (not isinstance(buyer_message, str) or not _DIRECT_LIST.fullmatch(buyer_message)
             or channel not in {'sms','whatsapp'} or media_offer
             or not isinstance(menus,list) or len(menus)>1
             or any(not isinstance(m,dict) or m.get('type')!='property' for m in menus)
-            or not observations or any(not isinstance(o,dict)
-                or o.get('tool') not in _RECONCILABLE_TOOLS
-                or o.get('status')!='executed' or o.get('error_code') is not None
-                for o in observations)
+            or evidence is None
             or not isinstance(search_batches,list) or not 1<=len(search_batches)<=50
-            or sum(o.get('tool')=='search_properties' for o in observations)!=len(search_batches)):
+            or evidence[0]!=len(search_batches)):
         note('request_or_tool_evidence')
         return None
+    if evidence[1]:
+        note('recoverable_search_rejection')
     criteria=extracted_criteria(buyer_message)
     if set(criteria)!={'bedrooms','max_price_usd'}:
         note('unsupported_criteria')
@@ -234,3 +268,54 @@ def reconcile_direct_catalog(reply, *, buyer_message, search_batches, menus,
             note('invalid_catalog_row')
             continue
     return None
+
+
+def reconcile_catalog_delivery(reply, *, buyer_message, search_batches, menus,
+                               observations, active_search, inbound_id, media_offer,
+                               channel):
+    """Recover a verified visible menu from the current successful search.
+
+    Like demo delivery_policy, this is a presentation contract, not a second
+    agent. Preserve membership and order. A failed exploratory call contributes
+    no rows. Do not mix batches, invent availability or authorize any effect.
+    The stricter exact-request renderer handles earlier complete batches.
+    """
+    from .conversation_parity import delivered_property_menu
+    from .bp_operation_receipts import visible_menu
+    from app.modules.sales_agent.response_policy import render_channel_text
+
+    evidence = catalog_read_evidence(observations)
+    if (evidence is None or not isinstance(search_batches, list)
+            or not 1 <= len(search_batches) <= 50
+            or evidence[0] != len(search_batches)
+            or not isinstance(menus, list) or len(menus) > 1
+            or any(not isinstance(m, dict) or m.get('type') != 'property' for m in menus)
+            or channel not in {'sms', 'whatsapp'}):
+        return None
+    if (any(not isinstance(b, dict) or not isinstance(b.get('search'), dict)
+            or b['search'].get('source_inbound_message_id') != inbound_id
+            or not isinstance(b.get('rows'), list) for b in search_batches)
+            or search_batches[-1]['search'] != active_search):
+        return None
+    rows = search_batches[-1]['rows']
+    if not 2 <= len(rows) <= 20 or any(not isinstance(row, dict) for row in rows):
+        return None
+    # Bind from the actual rendered message rather than an internal proposal
+    # built from an intermediate (potentially rejected) search.
+    rendered = render_channel_text(reply, channel)
+    menu = delivered_property_menu(rendered, rows)
+    if not menu or not visible_menu(rendered, menu):
+        return None
+    if menus and menus[0] != menu:
+        return None
+    refs = {option['unit_id'] for option in menu['options']}
+    if any(row.get('reference') in refs and (
+            row.get('availability_verified') is not True
+            or (row.get('kind') == 'property_type' and
+                (type(row.get('available_units')) is not int or row['available_units'] <= 0)))
+           for row in rows):
+        return None
+    return reconcile_numbered_catalog(rendered, buyer_message=buyer_message,
+        search_rows=rows, menus=[menu], observations=observations,
+        active_search=active_search, inbound_id=inbound_id,
+        media_offer=media_offer, channel=channel)

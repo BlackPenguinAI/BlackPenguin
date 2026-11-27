@@ -103,3 +103,13 @@ def test_catalog_reconciliation_exports_only_fixed_reason_codes():
     assert 'PRIVATE-KEY-TEST' not in t.serialized()
     assert clean_event({'event':'catalog_reconciliation','applied':'secret','search_batches':10000,
         'reasons':['canonical_rendered','secret']})=={'event':'catalog_reconciliation','reasons':['canonical_rendered']}
+
+
+def test_search_rejections_remain_precise_and_sanitized():
+    for code in ('INVALID_SEARCH','PERMANENT_SCOPE_REQUIRES_EVIDENCE'):
+        assert clean_event({'event':'tool','tool':'search_properties','status':'rejected',
+            'error_code':code,'arguments':{'private':'PRIVATE-KEY-TEST'}})=={
+            'event':'tool','tool':'search_properties','status':'rejected','error_code':code}
+    event=clean_event({'event':'catalog_reconciliation','applied':True,'search_batches':1,
+        'reasons':['recoverable_search_rejection','visible_menu_rendered','private secret']})
+    assert event['reasons']==['recoverable_search_rejection','visible_menu_rendered']

@@ -45,9 +45,9 @@ TOOLSET = 'blackpenguin_real_estate_demo'  # Keep the validated SDK toolset name
 # provided ToolPort, never from domain.py, an imported database or browser input.
 SCHEMAS: dict[str, dict] = {
     'search_properties': {
-        'description': 'Primary tool for buyer searches and updated filters, including temporary alternatives while a visit is pending. Backend enforces temporary-vs-permanent scope and verified budget constraints. Never changes visit draft.',
+        'description': 'Read published properties matching buyer filters. Use temporary scope for exploration (including new searches while a visit is pending). This read never changes primary preferences or the visit draft. Use update_search_preferences only for explicit lasting declarations. Keep useful successful search results if a later argument is rejected. Report catalog prices in explicit currency with full amounts; a buyer ceiling is a filter, not a listing price.',
         'parameters': obj({
-            'scope': string('Exploratory comparison vs explicit lasting preference revision.', ['temporary','permanent']),
+            'scope': string('Default temporary for searches. Permanent only for an explicit lasting buyer declaration; search itself does not write preferences.', ['temporary','permanent']),
             'criteria': obj({
                 'bedrooms': integer(),
                 'bedrooms_any': {'type':'array','items':integer()},

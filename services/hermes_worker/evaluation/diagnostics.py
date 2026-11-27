@@ -42,7 +42,8 @@ TOOL_ERRORS = frozenset({
     'PERMISSIONERROR', 'PROPERTY_NOT_FOUND_OR_AMBIGUOUS',
     'PROPERTY_REFERENCE_CONFLICT', 'MEDIA_TYPE_REQUIRED', 'PROPERTY_REQUIRED',
     'VISIT_CHOICE_AMBIGUOUS', 'LIVE_ACTION_NOT_CERTIFIED',
-    'COMMERCIAL_POLICY_HOLD', 'VISIT_LOCATION_REQUIRED', 'unknown_error',
+    'COMMERCIAL_POLICY_HOLD', 'VISIT_LOCATION_REQUIRED', 'INVALID_SEARCH',
+    'PERMANENT_SCOPE_REQUIRES_EVIDENCE', 'unknown_error',
 })
 EXCEPTION_TYPES = frozenset({
     'AssertionError', 'ProductionToolError', 'RuntimeError', 'ValueError',
@@ -79,7 +80,8 @@ EVENTS = frozenset({'checkpoint', 'runtime_started', 'runtime_returned', 'runtim
 CATALOG_REASONS = frozenset({'request_or_tool_evidence','unsupported_criteria','ledger_mismatch',
     'search_scope_or_criteria','no_exact_criteria','incomplete_or_single_result','unverified_inventory',
     'row_filter_conflict','duplicate_reference','menu_unbound','renderer_rejected','invalid_catalog_row',
-    'canonical_rendered'})
+    'canonical_rendered','recoverable_search_rejection',
+    'visible_menu_rendered','visible_menu_not_proven'})
 MAX_EVENTS = 256
 REPLY_FLAGS = frozenset({'van_buren', 'oakwood', 'three_bedrooms_plain', 'three_bedrooms_unformatted',
                          'two_bathrooms_plain', 'two_bathrooms_unformatted', 'share_path', 'question'})
