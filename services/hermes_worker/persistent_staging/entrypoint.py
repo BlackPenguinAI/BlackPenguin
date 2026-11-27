@@ -44,6 +44,29 @@ def bootstrap(engine):
     print('Persistent staging initialized; no live jobs created.')
 
 
+def _check_upload_root(root, uid, gid):
+    """Verify storage identity and perform the same mkdir as the company service."""
+    import tempfile
+    require(root.is_dir() and not root.is_symlink(), 'Missing private uploads mount')
+    info = root.stat()
+    require((info.st_uid, info.st_gid) == (uid, gid) and (info.st_mode & 0o777) == 0o700, 'Wrong uploads ownership or mode')
+    receipts = root / 'receipts'
+    require(not receipts.is_symlink(), 'Unexpected receipts symlink')
+    receipts.mkdir(exist_ok=True)
+    # Test a real write, not os.access; remove the test file automatically.
+    with tempfile.TemporaryFile(dir=receipts) as probe:
+        probe.write(b'hei06a2')
+        probe.flush()
+
+
+def check_api_storage():
+    """Exercise the legacy relative receipts path as the running API user."""
+    from pathlib import Path
+    require(Path.cwd() == Path('/app'), 'Unexpected API working directory')
+    require(os.geteuid() == 10001 and os.getegid() == 10001, 'Unexpected API identity')
+    _check_upload_root(Path('uploads'), 10001, 10001)
+
+
 class ClosedIngress:
     def __init__(self, app): self.app=app
     async def __call__(self, scope, receive, send):
@@ -94,6 +117,7 @@ def main():
             begin('bootstrap');bootstrap(engine);done();return
         import uvicorn
         if mode=='api':
+            begin('api_storage');check_api_storage();done()
             begin('api_import')
             from app.main import app
             done()

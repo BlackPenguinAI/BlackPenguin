@@ -49,10 +49,15 @@ services:
       <<: *env
       PYTHONPATH: /app:/opt/stage
       HOME: /tmp
+    working_dir: /app
     entrypoint: ['python','/opt/stage/entrypoint.py']
     command: [api]
     volumes:
       - ./:/opt/stage:ro
+    # Legacy company receipts use a relative path at import time. Only this
+    # staging-specific data directory is made writable; no root/chmod workaround.
+    tmpfs:
+      - /app/uploads:rw,noexec,nosuid,nodev,uid=10001,gid=10001,mode=0700,size=16777216
     networks: [private]
     depends_on:
       staging-postgres:
