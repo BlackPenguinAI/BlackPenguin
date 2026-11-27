@@ -1,6 +1,15 @@
 name: Hermes HEI-06A.2 persistent staging foundation
 on:
   workflow_dispatch:
+    inputs:
+      run_scoped:
+        description: "Run HEI-06A.2b.1 scoped simulation authorization after foundation"
+        type: boolean
+        default: false
+      run_openrouter:
+        description: "Run real SDK (requires run_scoped)"
+        type: boolean
+        default: false
 permissions:
   contents: read
 concurrency:
@@ -9,7 +18,7 @@ concurrency:
 jobs:
   persistent-foundation:
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 45
     env:
       PYTHONDONTWRITEBYTECODE: '1'
     steps:
@@ -21,7 +30,11 @@ jobs:
         run: |
           set -euo pipefail
           base=a61178b09f1856d42a6698fd3f0eddf8e4ae0ab6
+          test "${{ inputs.run_openrouter }}" != true || test "${{ inputs.run_scoped }}" = true
           git merge-base --is-ancestor "$base" "$GITHUB_SHA"
+          if test "${{ inputs.run_scoped }}" = true; then
+            git merge-base --is-ancestor 0eb7da1e8c675126f77ef94ddefa561cd2686246 "$GITHUB_SHA"
+          fi
           python3 - "$base" "$GITHUB_SHA" <<'PY'
           import subprocess, sys
           paths=subprocess.check_output(['git','diff','--name-only','-z',sys.argv[1],sys.argv[2]]).decode().split('\0')
@@ -53,6 +66,19 @@ jobs:
           python3 "$tool" up "$state"
           policy=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["policy_id"])' "$RUNNER_TEMP/hei06a2-evidence/initial.json")
           python3 "$tool" probe "$state" --expected-policy "$policy" | tee "$RUNNER_TEMP/hei06a2-evidence/recreated.json"
+      - name: HEI-06A.2b.1 scoped authorization and in-app receipts
+        if: inputs.run_scoped
+        shell: bash
+        env:
+          HEI06A2_SCOPED_OPENROUTER_API_KEY: ${{ inputs.run_openrouter && secrets.HEI06_OPENROUTER_API_KEY || '' }}
+        run: |
+          set -euo pipefail
+          args=()
+          if test "${{ inputs.run_openrouter }}" = true; then
+            test -n "$HEI06A2_SCOPED_OPENROUTER_API_KEY"
+            args+=(--model)
+          fi
+          python3 services/hermes_worker/persistent_staging/scoped_acceptance.py "$RUNNER_TEMP/hei06a2-state" "${args[@]}" | tee "$RUNNER_TEMP/hei06a2-evidence/scoped.json"
       - name: Confirm persistence and clean hosted CI only
         shell: bash
         run: |
@@ -67,7 +93,9 @@ jobs:
           python3 - "$RUNNER_TEMP/hei06a2-evidence" <<'PY'
           import json,pathlib,sys
           p=pathlib.Path(sys.argv[1]); a=json.loads((p/'initial.json').read_text())
-          (p/'summary.json').write_text(json.dumps({'status':'PASS','candidate_commit':a['candidate_commit'],'published_policy_preserved':True,'real_inference':'NOT_RUN','live_staging_authorization':'NOT_RUN','real_provider_acceptance':'NOT_RUN','production_readiness':'CLOSED'},indent=2)+'\n')
+          scoped=json.loads((p/'scoped.json').read_text()) if (p/'scoped.json').exists() else {}
+          assert not scoped or scoped['status']=='PASS'
+          (p/'summary.json').write_text(json.dumps({'status':'PASS','candidate_commit':a['candidate_commit'],'published_policy_preserved':True,'scoped_simulation_authorization':scoped.get('status','NOT_RUN'),'real_inference':scoped.get('real_inference','NOT_RUN'),'live_staging_authorization':'NOT_RUN','real_provider_acceptance':'NOT_RUN','production_readiness':'CLOSED'},indent=2)+'\n')
           PY
       - name: Capture sanitized startup evidence before cleanup
         if: failure()
@@ -98,5 +126,12 @@ jobs:
         if: always()
         run: |
           echo '## HEI-06A.2 — closed persistent foundation' >> "$GITHUB_STEP_SUMMARY"
-          echo '- Full live staging authorization, real inference and external providers: NOT_RUN.' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Full live worker routing and external providers: NOT_RUN.' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Scoped simulation requested: ${{ inputs.run_scoped }}; real OpenRouter requested: ${{ inputs.run_openrouter }}.' >> "$GITHUB_STEP_SUMMARY"
+          if test -f "$RUNNER_TEMP/hei06a2-evidence/scoped.json"; then
+            python3 - "$RUNNER_TEMP/hei06a2-evidence/scoped.json" <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json,sys
+          r=json.load(open(sys.argv[1])); print('- Scoped simulation: '+r['status']+'; real inference: '+r['real_inference'])
+          PY
+          fi
           echo '- Production readiness: CLOSED.' >> "$GITHUB_STEP_SUMMARY"
