@@ -20,6 +20,21 @@ def booking_fingerprint(row) -> str:
     return sha256(json.dumps(value, ensure_ascii=False, sort_keys=True, default=str).encode()).hexdigest()
 
 
+def _property_visible(reply, record):
+    # display_name is attached only by the scoped live domain renderer, not
+    # taken from an SDK tool argument. Keep the internal reference for all
+    # operation/offer identity checks. Legacy records use their reference.
+    ref = record.get('unit_id')
+    if not isinstance(ref,str) or not ref.strip():
+        return False
+    label = record.get('display_name')
+    if label is None:
+        return ref.casefold() in reply.casefold()
+    if not isinstance(label, str) or not label.strip():
+        return False
+    return bool(re.search(r'(?<![\w-])' + re.escape(label) + r'(?![\w-])', reply, re.I))
+
+
 def recap_visible(reply: str, request: dict) -> bool:
     """Fail-closed: prove the delivered text included exact house/date/hour.
 
@@ -32,8 +47,8 @@ def recap_visible(reply: str, request: dict) -> bool:
     if request.get('live_change_version'):
         from .live_changes import recap_matches
         return recap_matches(reply,request)
-    required=[request.get('unit_id'),request.get('date'),request.get('start_time')]
-    if not all(isinstance(x,str) and x and x.casefold() in reply.casefold() for x in required):
+    required=[request.get('date'),request.get('start_time')]
+    if not _property_visible(reply,request) or not all(isinstance(x,str) and x and x.casefold() in reply.casefold() for x in required):
         return False
     if not re.search(r'\b(?:confirm|book|replace|reschedule)\b',reply,re.I) or '?' not in reply:
         return False
@@ -77,7 +92,7 @@ def visible_menu(reply: str, menu: dict) -> bool:
         return False
     if menu['type']=='visit_time':
         # The day and property must be visible, not just a list of anonymous hours.
-        if menu.get('unit_id','').casefold() not in reply.casefold():
+        if not _property_visible(reply,menu):
             return False
         day = menu.get('date')
         if not day:
@@ -85,6 +100,6 @@ def visible_menu(reply: str, menu: dict) -> bool:
         from .contextual_choices import _date_label
         if day not in reply and _date_label(day).casefold() not in reply.casefold():
             return False
-    elif menu['type']=='visit_day' and menu.get('unit_id','').casefold() not in reply.casefold():
+    elif menu['type']=='visit_day' and not _property_visible(reply,menu):
         return False
     return True

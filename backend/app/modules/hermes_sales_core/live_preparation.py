@@ -113,7 +113,52 @@ def _live_port(db,snapshot,working,inbound,holds):
             self.db=db;self.inbound_id=inbound.id;self.now=datetime.now(timezone.utc)
             self.menus=[];self._availability_search=None;self._meeting_reader=None;self._material_reader=None
             self.search_rows=None;self.choice=None;self.explicit_focus=None;self.discovered={};self.offered_media=None
-            self.search_batches=[]
+            self.search_batches=[];self.slot_batches=[];self.comparison_batches=[]
+            self.comparison_rows=[];self.comparison_details={};self.primary_captured=False
+            self.prior_visit_offer=deepcopy(working.get('last_slot_search'))
+            self.prior_visit_draft=deepcopy(working.get('visit_draft'))
+
+        def prepare_context(self,context):
+            import re
+            from .conversation_parity import named_rows,display_name
+            super().prepare_context(context)
+            # Explicit multi-property reads do not select a single focus.
+            named=named_rows(self._all_rows(),self.message)
+            if (2<=len(named)<=3 and len({display_name(r).casefold() for r in named})==len(named)
+                    and re.search(r'\b(?:compare|comparison|between|difference|which.{0,80}more)\b',self.message,re.I)
+                    and not re.search(r'\b(?:send|share|book|visit|cancel|reschedule)\b',self.message,re.I)):
+                self.comparison_rows=deepcopy(named)
+                context['explicit_comparison_properties']=[{**r,'display_name':display_name(r)} for r in named]
+
+        def _details(self,args):
+            from .conversation_parity import display_name
+            if self.comparison_rows and args.get('unit_id'):
+                row=self._resolve(args['unit_id'])
+                if row and row['reference'] in {r['reference'] for r in self.comparison_rows}:
+                    result=BlackPenguinReadPort._details(self,args)
+                    if result.get('ok'):
+                        result['property']['display_name']=display_name(result['property'])
+                        self.comparison_details[row['reference']]=deepcopy(result['property'])
+                        if set(self.comparison_details)=={r['reference'] for r in self.comparison_rows}:
+                            self.comparison_batches.append(list(deepcopy(self.comparison_details).values()))
+                    return result
+            return super()._details(args)
+
+        def _compare(self,args):
+            from .conversation_parity import display_name
+            result=super()._compare(args)
+            if result.get('ok'):
+                for row in result['properties']:
+                    row['display_name']=display_name(row)
+                self.comparison_batches.append(deepcopy(result['properties']))
+            return result
+
+        def _slots(self,args):
+            result=super()._slots(args)
+            if result.get('ok'):
+                self.slot_batches.append({'result':deepcopy(result),'offer':deepcopy(self.state.get('last_slot_search')),
+                    'draft':deepcopy(self.state.get('visit_draft')),'args':deepcopy(args)})
+            return result
 
         def invoke(self,name,arguments,scope):
             if scope!=snapshot.scope:raise PermissionError('Live tool scope mismatch.')
@@ -129,6 +174,8 @@ def _live_port(db,snapshot,working,inbound,holds):
                 db.rollback()
 
         def _search(self,args):
+            from .commercial_delivery import reconcile_temporary_filters
+            args=reconcile_temporary_filters(self.message,self.state,args)
             result=super()._search(args)
             if result.get('ok'):
                 # Exact, turn-local copies from the authorized port, not the
@@ -264,6 +311,14 @@ def prepare_live_turn(db,scope,*,inbound_message_id,run_id):
     lead_view=SimpleNamespace(full_name=lead.full_name,lead_profile_data=deepcopy(lead.lead_profile_data))
     buyer_message=inbound.content; channel=conversation.channel
     db.commit()  # no row lock or open transaction during LLM inference
+    from .commercial_delivery import (primary_declaration,primary_ack,search_reply,visit_reply,compare_reply,
+        verified_budget_profile)
+    if (len(sources)==1 and 'update_search_preferences' in enabled
+            and primary_declaration(buyer_message,working)):
+        capture=port.invoke('update_search_preferences',{},scope)
+        if capture.get('ok'):
+            port.primary_captured=True
+            context['primary_preferences']=deepcopy(working.get('search_preferences'))
     result=HermesSalesRuntime(settings,port,state_draft_tools=frozenset({'update_search_preferences'}),
         operational_draft_tools=LIVE_DRAFT_TOOLS,enabled_tools=enabled).process_turn(TurnRequest(
             scope=scope,message=buyer_message,history=history,verified_context=context,channel=channel))
@@ -281,6 +336,14 @@ def prepare_live_turn(db,scope,*,inbound_message_id,run_id):
     elif booking.get('live_change_version')==CHANGE_VERSION and booking.get('status')=='recap_required' and booking.get('selected_inbound_message_id')==inbound_message_id:
         from .live_changes import change_recap
         reply=change_recap(booking)
+    elif len(sources)==1:
+        # Domain-owned verified delivery contracts, as in demo v13.3.3.
+        # Never re-run an external action or replace Hermes's inference loop.
+        commercial_reply=visit_reply(port,result.tool_observations,enabled)
+        if commercial_reply is None:
+            commercial_reply=compare_reply(port,result.tool_observations)
+        if commercial_reply is not None:
+            reply=commercial_reply
     from app.modules.sales_agent.response_policy import render_channel_text,split_channel_text
     from app.modules.sales_agent.monetary_policy import validate_monetary_reply
     from app.modules.sales_agent.language_policy import detect,scoped_names
@@ -318,14 +381,29 @@ def prepare_live_turn(db,scope,*,inbound_message_id,run_id):
             reply,buyer_message=buyer_message,search_batches=port.search_batches,menus=port.menus,
             observations=result.tool_observations,active_search=working.get('active_search'),
             inbound_id=inbound_message_id,media_offer=port.offered_media,channel=channel)
-        if repair is None:
-            raise ProductionToolError('Reply requires monetary reconciliation before dispatch.')
-        candidate,menu=repair
-        checked,evidence=validate_monetary_reply(candidate,data.commercial,lead_profile=lead_view.lead_profile_data)
-        if checked!=candidate or not evidence.get('checked') or evidence.get('replaced'):
-            raise ProductionToolError('Reply requires monetary reconciliation before dispatch.')
-        reply=candidate
-        port.menus=[menu]
+        if repair is not None:
+            candidate,menu=repair
+            checked,evidence=validate_monetary_reply(candidate,data.commercial,lead_profile=lead_view.lead_profile_data)
+            if checked!=candidate or not evidence.get('checked') or evidence.get('replaced'):
+                raise ProductionToolError('Reply requires monetary reconciliation before dispatch.')
+            reply=candidate
+            port.menus=[menu]
+        else:
+            candidate=None
+            if not (material_now or booking_now or len(sources)>1):
+                candidate=search_reply(port,result.tool_observations,channel,monetary_rejected=True)
+                if candidate is None:
+                    candidate=primary_ack(port,result.tool_observations)
+            if candidate is None:
+                raise ProductionToolError('Reply requires monetary reconciliation before dispatch.')
+            candidate=render_channel_text(candidate,channel)
+            # Only our canonical, evidence-derived repair may use this
+            # ephemeral buyer-budget exemption. Original model text cannot.
+            budget_profile=verified_budget_profile(port,result.tool_observations,lead_view.lead_profile_data)
+            checked,evidence=validate_monetary_reply(candidate,data.commercial,lead_profile=budget_profile)
+            if checked!=candidate or evidence.get('replaced'):
+                raise ProductionToolError('Reply requires monetary reconciliation before dispatch.')
+            reply=candidate
     if detect(reply,names=scoped_names(project_view,lead_view,data.commercial),output=True).needs_reentry:
         raise ProductionToolError('Reply requires language reconciliation before dispatch.')
     working.pop('_active_source_message_id',None)

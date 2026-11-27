@@ -65,6 +65,11 @@ jobs:
             -v "$GITHUB_WORKSPACE/services/hermes_worker/evaluation:/opt/evaluation:ro" \
             -v "$GITHUB_WORKSPACE/evidence-controlled:/evidence" --entrypoint python "$HEI06_IMAGE" \
             /opt/evaluation/probe_private_network.py --commit "$GITHUB_SHA" --output /evidence/private-network.json
+      - name: Commercial delivery parity regression (22 focused cases)
+        run: |
+          docker run --rm --network none --env-file "$RUNNER_TEMP/hei06-controlled.env" \
+            -v "$GITHUB_WORKSPACE/services/hermes_worker/evaluation:/opt/evaluation:ro" \
+            --entrypoint python "$HEI06_IMAGE" -m pytest -q --disable-warnings /opt/evaluation/test_commercial_delivery.py
       - name: Actual socket worker and expanded offline scenario harness (22 cases)
         run: |
           docker run --rm --network none --env-file "$RUNNER_TEMP/hei06-controlled.env" \
