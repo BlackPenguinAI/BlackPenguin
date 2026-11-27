@@ -5,11 +5,11 @@ fixed to the published synthetic baseline (openai/gpt-4o-mini). Failure is
 blocking evidence, never a retry-until-pass or a substituted SDK.
 """
 import os
-import re
 import pytest
 from diagnostics import PROPERTY, SafeTrace
+from focus_grounding import FocusGrounding, assert_fact_reply
 from test_bp_hei03b3_worker_delivery import real_lane  # noqa: F401
-from sdk_scenarios import hei06_lane_engine, seed_catalog, first_input, next_input, state, tools_for, verify_material_and_replay
+from sdk_scenarios import hei06_lane_engine, seed_catalog, first_input, next_input, state, tools_for, observations_for, verify_material_and_replay
 
 pytestmark = pytest.mark.usefixtures('hei06_lane_engine')
 
@@ -29,12 +29,14 @@ def trace(real_lane, monkeypatch, record_property):
     """Observe the actual SDK and worker; no replacement of responses or effects."""
     from app.modules.hermes_sales_core.runtime import HermesSalesRuntime
     t = SafeTrace()
+    t.focus = FocusGrounding()
     runtime_original = HermesSalesRuntime.process_turn
     prepare_original = real_lane.sdk_service.prepare_reserved
     worker_original = real_lane.job.run_job
 
     def observed_runtime(runtime, request):
         t.add('runtime_started')
+        t.focus.observe(request)
         try:
             result = runtime_original(runtime, request)
         except Exception as exc:
@@ -85,15 +87,17 @@ def test_named_focus_pdf_followup_and_idempotency(real_lane, monkeypatch, tmp_pa
     trace.checkpoint('seed_catalog')
     seed_catalog(lane, monkeypatch, tmp_path)
     trace.checkpoint('named_details_turn')
-    mid = first_input(lane, 'Tell me the number of bedrooms in Van Buren.')
+    message = 'Tell me the number of bedrooms in Van Buren.'
+    trace.focus.expect(scope=lane.scope, message=message, ref='van', name='Van Buren', field='bedrooms', value=3)
+    mid = first_input(lane, message)
     trace.checkpoint('named_focus')
     assert state(lane)['conversation_focus']['property_type_id'] == 'van'
-    trace.checkpoint('named_details_tool')
-    assert 'get_unit_details' in tools_for(lane, mid)
+    trace.checkpoint('named_details_grounding')
+    trace.focus.finish(observations=observations_for(lane, mid), trace=trace)
     trace.checkpoint('named_reply_property')
     assert 'van buren' in lane.calls[-1].casefold()
     trace.checkpoint('named_reply_bedrooms')
-    assert re.search(r'\b(?:3|three)\s+bedrooms?\b', lane.calls[-1], re.I)
+    assert_fact_reply(lane.calls[-1], name='Van Buren', field='bedrooms', value=3)
     trace.checkpoint('implicit_pdf_turn')
     mid, jid = next_input(lane, 'Can you send me the PDF?')
     trace.checkpoint('pdf_focus')
@@ -125,15 +129,18 @@ def test_numbered_menu_and_second_option(real_lane, monkeypatch, tmp_path, repea
     assert {option['unit_id'] for option in menu['options']} == {'van','oak'}
     second = menu['options'][1]['unit_id']
     trace.checkpoint('second_option_turn')
-    mid, _ = next_input(lane, 'The second option. How many bathrooms does it have?')
+    message = 'The second option. How many bathrooms does it have?'
+    name, bathrooms = ('Van Buren', 1) if second == 'van' else ('Oakwood', 2)
+    trace.focus.expect(scope=lane.scope, message=message, ref=second, name=name, field='bathrooms', value=bathrooms, ordinal=True)
+    mid, _ = next_input(lane, message)
     trace.checkpoint('second_option_focus')
     assert state(lane)['conversation_focus']['property_type_id'] == second
-    trace.checkpoint('second_option_details_tool')
-    assert 'get_unit_details' in tools_for(lane, mid)
+    trace.checkpoint('second_option_details_grounding')
+    trace.focus.finish(observations=observations_for(lane, mid), trace=trace)
     trace.checkpoint('second_option_reply_property')
     assert ('van buren' if second == 'van' else 'oakwood') in lane.calls[-1].casefold()
     trace.checkpoint('second_option_reply_bathrooms')
-    assert re.search(r'\b(?:2|two)\s+bathrooms?\b', lane.calls[-1], re.I)
+    assert_fact_reply(lane.calls[-1], name=name, field='bathrooms', value=bathrooms)
     trace.checkpoint('second_option_run_count')
     assert lane.db.query(lane.Run).count() == 2
     trace.checkpoint('complete')

@@ -17,14 +17,14 @@ CASES = {
     ] for i in (1, 2)
 }
 CHECKPOINTS = frozenset({
-    'seed_catalog', 'named_details_turn', 'named_focus', 'named_details_tool',
+    'seed_catalog', 'named_details_turn', 'named_focus', 'named_details_tool', 'named_details_grounding',
     'named_reply_property', 'named_reply_bedrooms', 'implicit_pdf_turn',
     'pdf_focus', 'pdf_share', 'pdf_operation_receipt', 'pdf_media_tool',
     'pdf_outbound_link', 'pdf_replay', 'pdf_no_duplicate_delivery',
     'pdf_no_duplicate_inference', 'pdf_no_duplicate_share', 'stop_turn',
     'stop_no_inference', 'stop_opt_out', 'numbered_search_turn',
     'numbered_search_tool', 'numbered_menu_shape', 'numbered_menu_refs',
-    'second_option_turn', 'second_option_focus', 'second_option_details_tool',
+    'second_option_turn', 'second_option_focus', 'second_option_details_tool', 'second_option_details_grounding',
     'second_option_reply_property', 'second_option_reply_bathrooms',
     'second_option_run_count', 'complete',
 })
@@ -74,7 +74,7 @@ EXACT_ERRORS = {
 ERROR_REASONS = frozenset(EXACT_ERRORS.values()) | {'sdk_tool_allowlist_mismatch', 'unknown_reason'}
 EVENTS = frozenset({'checkpoint', 'runtime_started', 'runtime_returned', 'runtime_error',
                     'prepare_started', 'prepare_returned', 'prepare_error',
-                    'worker_started', 'worker_returned', 'worker_error', 'tool', 'reply_shape'})
+                    'worker_started', 'worker_returned', 'worker_error', 'tool', 'reply_shape', 'fact_grounding'})
 MAX_EVENTS = 256
 REPLY_FLAGS = frozenset({'van_buren', 'oakwood', 'three_bedrooms_plain', 'three_bedrooms_unformatted',
                          'two_bathrooms_plain', 'two_bathrooms_unformatted', 'share_path', 'question'})
@@ -116,6 +116,11 @@ def clean_event(raw):
         result['status'] = allowed(raw.get('status'), {'executed', 'rejected'}, 'unknown_status')
         error = raw.get('error_code')
         result['error_code'] = None if error is None else allowed(error, TOOL_ERRORS, 'unknown_error')
+    elif kind == 'fact_grounding':
+        result['field'] = allowed(raw.get('field'), {'bedrooms', 'bathrooms'}, 'unknown_field')
+        for flag in ('verified_context', 'details_tool_executed', 'details_tool_rejected'):
+            if type(raw.get(flag)) is bool:
+                result[flag] = raw[flag]
     elif kind == 'reply_shape':
         result['source'] = allowed(raw.get('source'), {'sdk', 'outbound'}, 'unknown_source')
         for flag in sorted(REPLY_FLAGS):

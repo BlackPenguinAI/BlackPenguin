@@ -18,7 +18,7 @@ from diagnostics import case_details
 
 PINNED_SDK = 'b94cb8e2c4ebf2a8c7688cf676c3cf9899584adb'
 LANES = {
-    'offline_harness': ('test_harness_offline.py', 1),
+    'offline_harness': (('test_harness_offline.py', 'test_focus_grounding.py'), 33),
     'postgres_worker': ('test_candidate_postgres.py', 14),
     'openrouter_sdk': ('test_live_sdk.py', 4),
 }
@@ -63,10 +63,11 @@ def run(lane, commit, output):
         if lane == 'postgres_worker' and not os.environ.get('HEI06_POSTGRES_URL'):
             report['reason'] = 'ISOLATED_POSTGRES_URL_MISSING'
             return report
+        files = (file,) if isinstance(file, str) else file
         with tempfile.TemporaryDirectory(prefix='hei06-') as tmp:
             junit=Path(tmp)/'results.xml'
             env={**os.environ,'PYTEST_DISABLE_PLUGIN_AUTOLOAD':'1'}
-            args=[sys.executable,'-m','pytest','-q',str(Path(__file__).with_name(file)),
+            args=[sys.executable,'-m','pytest','-q',*[str(Path(__file__).with_name(name)) for name in files],
                   '--disable-warnings','--show-capture=no','--tb=no','--junitxml='+str(junit)]
             # No pytest/stdout or raw JUnit artifacts from the model lane. A
             # traceback or SDK diagnostic could include a URL or provider key.

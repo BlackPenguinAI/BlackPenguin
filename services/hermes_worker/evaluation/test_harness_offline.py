@@ -1,7 +1,8 @@
 """Offline validation of the E2E fixture; deliberately NOT real SDK evidence."""
 import pytest
 from test_bp_hei03b3_worker_delivery import real_lane  # noqa: F401
-from sdk_scenarios import hei06_lane_engine, seed_catalog, first_input, next_input, state, tools_for, verify_material_and_replay
+from focus_grounding import FocusGrounding, assert_fact_reply
+from sdk_scenarios import hei06_lane_engine, seed_catalog, first_input, next_input, state, tools_for, observations_for, verify_material_and_replay
 
 pytestmark = pytest.mark.usefixtures('hei06_lane_engine')
 
@@ -13,11 +14,15 @@ def test_harness_with_tool_driven_sdk_double(real_lane, monkeypatch, tmp_path):
     seed_catalog(lane, monkeypatch, tmp_path)
     monkeypatch.setenv('OPENROUTER_API_KEY', 'test-only')
 
+    proof = FocusGrounding()
+
     def fake(runtime, request):
+        proof.observe(request)
         if request.message.startswith('Tell me'):
-            tool = 'get_unit_details'
-            args = {'unit_id':'van'}
-            reply = 'Van Buren has 3 bedrooms.'
+            # Reproduce evaluation #10: answer from actual verified context,
+            # without manufacturing a successful tool call.
+            prop = request.verified_context['focused_property']
+            return TurnResult(f"{prop['display_name']} has {prop['bedrooms']} bedrooms.", [], [])
         elif request.message.startswith('Can you send'):
             tool = 'get_unit_media'
             args = {'unit_id':'van','media_type':'brochure'}
@@ -44,9 +49,13 @@ def test_harness_with_tool_driven_sdk_double(real_lane, monkeypatch, tmp_path):
         return TurnResult(reply, [], observations)
 
     monkeypatch.setattr(HermesSalesRuntime, 'process_turn', fake)
-    mid = first_input(lane, 'Tell me the number of bedrooms in Van Buren.')
+    message = 'Tell me the number of bedrooms in Van Buren.'
+    proof.expect(scope=lane.scope, message=message, ref='van', name='Van Buren', field='bedrooms', value=3)
+    mid = first_input(lane, message)
     assert state(lane)['conversation_focus']['property_type_id'] == 'van'
-    assert 'get_unit_details' in tools_for(lane, mid)
+    assert proof.finish(observations=observations_for(lane, mid)) == 'verified_context'
+    assert 'get_unit_details' not in tools_for(lane, mid)
+    assert_fact_reply(lane.calls[-1], name='Van Buren', field='bedrooms', value=3)
     mid, jid = next_input(lane, 'Can you send me the PDF?')
     verify_material_and_replay(lane, mid, jid)
     mid, _ = next_input(lane, 'Show me the available 3 bedroom houses under $350,000 as a numbered list.')
@@ -58,7 +67,11 @@ def test_harness_with_tool_driven_sdk_double(real_lane, monkeypatch, tmp_path):
     assert '$350,000' not in lane.calls[-1] and '$325k' not in lane.calls[-1]
     assert {'search_properties','get_project_overview'} <= tools_for(lane, mid)
     assert state(lane)['last_presented_choice_set']['options'][1]['unit_id'] == 'oak'
-    next_input(lane, 'The second option. How many bathrooms does it have?')
+    message = 'The second option. How many bathrooms does it have?'
+    proof.expect(scope=lane.scope, message=message, ref='oak', name='Oakwood', field='bathrooms', value=2, ordinal=True)
+    mid, _ = next_input(lane, message)
+    assert proof.finish(observations=observations_for(lane, mid)) == 'verified_context_and_tool'
+    assert_fact_reply(lane.calls[-1], name='Oakwood', field='bathrooms', value=2)
     assert state(lane)['conversation_focus']['property_type_id'] == 'oak'
     count = len(lane.sdk_calls)
     next_input(lane,'STOP')

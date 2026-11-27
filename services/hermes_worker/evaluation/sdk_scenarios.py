@@ -47,7 +47,7 @@ def seed_catalog(lane, monkeypatch, tmp_path):
     timestamp = datetime.now(timezone.utc).replace(tzinfo=None)
     for ref, name, price, sort in [('van', 'Van Buren', 325000, 0), ('oak', 'Oakwood', 340000, 1)]:
         db.add(ProjectPropertyType(id=ref, project_id='project', name=name, review_status='confirmed',
-            bedrooms=3, bathrooms=2, starting_price=price, currency='USD', available_units=2,
+            bedrooms=3, bathrooms=1 if ref == 'van' else 2, starting_price=price, currency='USD', available_units=2,
             inventory_updated_at=timestamp, sort_order=sort))
     db.flush()
     content = b'%PDF-1.4\n% HEI06 synthetic brochure; no customer data\n%%EOF'
@@ -126,14 +126,18 @@ def state(lane):
     return value
 
 
-def tools_for(lane, message_id):
+def observations_for(lane, message_id):
     from app.modules.sales_agent.models import AgentRun
     runs = lane.db.query(AgentRun).filter_by(conversation_id='conversation').all()
     matching = [r for r in runs if (r.input_snapshot or {}).get('message_id') == message_id]
     assert len(matching) == 1 and matching[0].status == 'completed'
-    result = {x['tool'] for x in matching[0].output_snapshot['tool_observations'] if x['status']=='executed'}
+    result = matching[0].output_snapshot['tool_observations']
     lane.db.commit()
     return result
+
+
+def tools_for(lane, message_id):
+    return {x['tool'] for x in observations_for(lane, message_id) if x['status']=='executed'}
 
 
 def verify_material_and_replay(lane, mid, jid, trace=None):
