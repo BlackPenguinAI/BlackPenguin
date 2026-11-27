@@ -85,9 +85,10 @@ def test_primary_declarations_are_explicit_and_idempotent(message):
     saved=deepcopy(p.state['search_preferences']);sales_preferences.apply(p.state,changes,source_message_id='new')
     assert p.state['search_preferences']==saved and saved['revision']==1
     p.primary_captured=True
-    reply=d.primary_ack(p,[observed('update_search_preferences')]);profile=d.verified_budget_profile(p,[],{})
-    assert '350,000' in reply and 'exactly 3 bedrooms' in reply
-    assert validate_monetary_reply(reply,COMMERCIAL,lead_profile=profile)[0]==reply
+    reply=d.primary_ack(p,[observed('update_search_preferences')])
+    assert 'stated budget limit' in reply and 'exactly 3 bedrooms' in reply
+    assert '350,000' not in reply
+    assert validate_monetary_reply(reply,COMMERCIAL,lead_profile={})[0]==reply
 
 
 @pytest.mark.parametrize('message',[
@@ -103,11 +104,11 @@ def test_temporary_criteria_do_not_mutate_primary():
     p=Port('Show me 4 bedroom houses under $400,000.');p.state['search_preferences']['revision']=1
     p.state['search_preferences']['budget']['maximum_usd']=350000
     before=deepcopy(p.state);args={'scope':'temporary','criteria':{'bedrooms':3,'max_price_usd':350000}}
-    got=d.reconcile_temporary_filters(p.message,p.state,args)
-    assert got['criteria']=={'bedrooms':4,'max_price_usd':400000} and p.state==before
-    assert d.reconcile_temporary_filters(p.message,p.state,{**args,'scope':'permanent'})['scope']=='permanent'
+    # Independent agent read remains independent, and no preference is changed.
+    assert d.strict_search_bounds(p.message,args)==args and p.state==before
+    assert d.explicit_search_filters(p.message)=={'bedrooms':4,'max_price_usd':400000}
     other={'scope':'temporary','criteria':{'min_bathrooms':3}}
-    assert d.reconcile_temporary_filters(p.message,p.state,other)==other
+    assert d.strict_search_bounds(p.message,other)==other
 
 
 @pytest.mark.parametrize('message',[
@@ -119,15 +120,16 @@ def test_no_match_budget_evidence_does_not_become_listing_price(message):
     p=Port(message);p.search({'bedrooms':6,'max_price_usd':100000},[])
     obs=[observed('search_properties')];before=deepcopy(p.state['search_preferences'])
     reply=d.search_reply(p,obs,'sms',monetary_rejected=True)
-    assert 'no verified matches' in reply and '100,000' in reply and p.menus==[]
+    assert 'no verified matches' in reply and 'within your stated budget' in reply and p.menus==[]
+    assert '100,000' not in reply
     original={'facts':{'budget_maximum':{'value':999}}}
-    profile=d.verified_budget_profile(p,obs,original)
-    assert profile!=original and original=={'facts':{'budget_maximum':{'value':999}}}
     assert p.state['search_preferences']==before
-    checked,evidence=validate_monetary_reply(reply,COMMERCIAL,lead_profile=profile)
-    assert checked==reply and evidence['checked'] and not evidence['replaced']
+    # Preparation and dispatch both see the real persisted profile.
+    checked,evidence=validate_monetary_reply(reply,COMMERCIAL,lead_profile=original)
+    assert checked==reply and not evidence['replaced']
     for fake in ('Van Buren costs USD 100,000.','Your budget is USD 200,000.'):
-        assert validate_monetary_reply(fake,COMMERCIAL,lead_profile=profile)[1]['replaced']
+        assert validate_monetary_reply(fake,COMMERCIAL,lead_profile=original)[1]['replaced']
+    assert original=={'facts':{'budget_maximum':{'value':999}}}
 
 
 @pytest.mark.parametrize('source,count,criteria',[
@@ -139,7 +141,7 @@ def test_incomplete_or_wrong_search_cannot_supply_budget_evidence(source,count,c
     p=Port('Find 6 bedroom homes below $100,000.');p.search(criteria,[],source=source,count=count)
     obs=[observed('search_properties')]
     assert d.search_reply(p,obs,'sms',monetary_rejected=True) is None
-    assert d.verified_budget_profile(p,obs,{})=={}
+    assert d.search_reply(p,obs,'sms',monetary_rejected=False) is None
 
 
 def test_temporary_single_result_is_approved_and_not_a_preference_change():

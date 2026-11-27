@@ -65,11 +65,11 @@ jobs:
             -v "$GITHUB_WORKSPACE/services/hermes_worker/evaluation:/opt/evaluation:ro" \
             -v "$GITHUB_WORKSPACE/evidence-controlled:/evidence" --entrypoint python "$HEI06_IMAGE" \
             /opt/evaluation/probe_private_network.py --commit "$GITHUB_SHA" --output /evidence/private-network.json
-      - name: Commercial delivery and demo turn lifecycle (45 focused cases + 3 evidence checks)
+      - name: Commercial delivery and demo turn lifecycle (49 focused cases + 7 evidence checks)
         run: |
           docker run --rm --network none --env-file "$RUNNER_TEMP/hei06-controlled.env" \
             -v "$GITHUB_WORKSPACE/services/hermes_worker/evaluation:/opt/evaluation:ro" \
-            --entrypoint python "$HEI06_IMAGE" -m pytest -q --disable-warnings /opt/evaluation/test_commercial_delivery.py /opt/evaluation/test_turn_lifecycle.py /opt/evaluation/test_lifecycle_evidence.py
+            --entrypoint python "$HEI06_IMAGE" -m pytest -q --disable-warnings /opt/evaluation/test_commercial_delivery.py /opt/evaluation/test_turn_lifecycle.py /opt/evaluation/test_lifecycle_evidence.py /opt/evaluation/test_offline_evidence.py
       - name: Actual socket worker and expanded offline scenario harness (22 cases)
         run: |
           docker run --rm --network none --env-file "$RUNNER_TEMP/hei06-controlled.env" \
@@ -82,7 +82,8 @@ jobs:
           docker run --rm --network none --env-file "$RUNNER_TEMP/hei06-controlled.env" \
             -v "$GITHUB_WORKSPACE/backend/tests:/opt/bp-tests:ro" \
             -v "$GITHUB_WORKSPACE/services/hermes_worker/evaluation:/opt/evaluation:ro" \
-            --entrypoint python "$HEI06_IMAGE" -m pytest -q --disable-warnings --show-capture=no --tb=short /opt/evaluation/test_turn_lifecycle_harness.py
+            -v "$GITHUB_WORKSPACE/evidence-controlled:/evidence" --entrypoint python "$HEI06_IMAGE" \
+            /opt/evaluation/run_staging.py --lane imperfect --commit "$GITHUB_SHA" --output /evidence/imperfect.json
       - name: Evidence exporter and comparison checks (9 cases)
         run: |
           docker run --rm --network none --env-file "$RUNNER_TEMP/hei06-controlled.env" \

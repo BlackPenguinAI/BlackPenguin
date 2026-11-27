@@ -67,11 +67,10 @@ def primary_ack(port, observations):
     if not prefs.get('revision') or not declared:
         return None
     # No new listing price claim, no new search, no inferred consent.
-    from app.modules.money import format_amount
     lines = []
     cap = (declared.get('budget') or {}).get('maximum_usd')
     if cap is not None and cap == (prefs.get('budget') or {}).get('maximum_usd'):
-        lines.append(f'Your budget limit is USD {format_amount(cap)}.')
+        lines.append("I've noted your stated budget limit.")
     beds = declared.get('bedrooms') or {}
     if beds.get('mode') == 'exact' and beds.get('preferred') == (prefs.get('bedrooms') or {}).get('preferred'):
         lines.append(f"I've noted that you need exactly {beds['preferred']} bedrooms.")
@@ -108,27 +107,6 @@ def explicit_search_filters(message):
     if re.search(r'\b(?:MXN|PEN|EUR|CAD|GBP|BRL|COP|ARS|CLP|pesos?|soles|euros?)\b|[€£]', message, re.I):
         return None
     return requested
-
-
-def reconcile_temporary_filters(message, state, args):
-    """Respect explicit temporary criteria, without revising primary preferences.
-
-    Applies to explicit searches even before a primary profile exists.
-    Unsupported/compound filters stay on the native path.
-    """
-    prefs = state.get('search_preferences') or {}
-    if primary_declaration(message, state) or commercial_turn.clear_permanent_revision(message):
-        return args
-    if prefs.get('revision') and commercial_turn.scope(message, True) != 'temporary':
-        return args
-    requested = explicit_search_filters(message)
-    raw = args.get('criteria') or {}
-    if (not requested or not isinstance(raw,dict) or args.get('scope') not in (None,'temporary')
-            or set(raw)-{'bedrooms','bedrooms_any','bedrooms_min','bedrooms_max','max_price_usd','relative_price_lt'}):
-        return args
-    # Do not treat this as an instruction to update preferences. In particular
-    # do not let a saved cap silently replace the buyer's exploratory ceiling.
-    return {**args,'scope':'temporary','criteria':requested}
 
 
 def strict_search_bounds(message, args):
@@ -197,11 +175,12 @@ def search_reply(port, observations, channel, *, monetary_rejected=False, model_
     if not rows:
         port.menus = []
         port.state['last_presented_units'] = []
-        from app.modules.money import format_amount
         criteria=explicit_search_filters(port.message)
-        return (f'Your budget limit for this search is USD {format_amount(criteria["max_price_usd"])}. '
-                f'I found no verified matches for the requested {criteria["bedrooms"]} bedrooms. '
-                'Would you like to adjust a criterion?')
+        # The dispatch backstop uses the persisted CRM profile. A search
+        # ceiling is not a listing price or an already persisted preference.
+        # Refer to the buyer's own criteria without echoing a monetary amount.
+        return (f'I found no verified matches for homes with {criteria["bedrooms"]} bedrooms '
+                'within your stated budget. Would you like to adjust your budget or the number of bedrooms?')
     if len(rows) != 1:
         return None
     from .conversation_parity import display_name
@@ -220,42 +199,6 @@ def search_reply(port, observations, channel, *, monetary_rejected=False, model_
     port.menus = []
     port.state['last_presented_units'] = [row['reference']]
     return f'{name}: {row["bedrooms"]} bedrooms; {label} USD {amount}. Would you like to explore this property?'
-
-
-def verified_budget_profile(port, observations, lead_profile):
-    """Ephemeral evidence for our canonical repair ONLY, not the model reply.
-
-    Reuse the existing monetary guard's explicit buyer-budget exemption. Never
-    add a search ceiling to the set of approved listing prices or store it as
-    a persistent CRM budget. Unrelated, previous and speculative amounts do
-    not become evidence for this repair.
-    """
-    if not safe_tools(observations, _READS):
-        return lead_profile
-    cap = None
-    batches = port.search_batches
-    if (batches and batches[-1]['search'] == port.state.get('active_search')
-            and exact_search(batches[-1],port.message,port.inbound_id)):
-        cap = explicit_search_filters(port.message)['max_price_usd']
-    elif getattr(port,'primary_captured',False):
-        declared = primary_declaration(port.message,port.state)
-        current = (port.state.get('search_preferences') or {}).get('budget') or {}
-        value = (declared.get('budget') or {}).get('maximum_usd')
-        if value is not None and value == current.get('maximum_usd'):
-            cap = value
-    if type(cap) is not int or cap <= 0:
-        return lead_profile
-    profile = deepcopy(lead_profile) if isinstance(lead_profile,dict) else {}
-    facts = profile.get('facts')
-    if not isinstance(facts,dict):
-        facts = {}
-    else:
-        facts = deepcopy(facts)
-    facts.pop('budget_minimum',None);facts.pop('budget_maximum',None)
-    facts['budget'] = {'value': {'maximum':cap,'currency':'USD'}}
-    facts['budget_currency'] = {'value':'USD'}
-    profile['facts']=facts
-    return profile
 
 
 def visible_name(port, ref):

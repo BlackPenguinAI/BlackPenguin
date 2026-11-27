@@ -64,19 +64,18 @@ def test_first_search_and_no_match_do_not_depend_on_monetary_failure(message):
     p=LifecyclePort(message)
     prior=deepcopy(p.state['search_preferences'])
     wrong={'scope':'temporary','criteria':{'bedrooms':3,'max_price_usd':350000}}
-    corrected=d.reconcile_temporary_filters(message,p.state,wrong)
-    assert corrected['criteria']=={'bedrooms':6,'max_price_usd':100000}
+    assert d.strict_search_bounds(message,wrong)==wrong
+    assert d.explicit_search_filters(message)=={'bedrooms':6,'max_price_usd':100000}
     assert p.state['search_preferences']==prior
     # Even if Hermes omits the search altogether, use the native read once.
     assert d.ensure_search(p,[],{'search_properties'})
     assert d.ensure_search(p,[],{'search_properties'})
     assert len(p.calls)==1
     reply=d.search_reply(p,[],'sms',model_reply='I can help you explore homes.')
-    assert 'no verified matches' in reply and '100,000' in reply
+    assert 'no verified matches' in reply and '100,000' not in reply
     assert p.state['search_preferences']==prior and p.state['active_search']['match_count']==0
-    profile=d.verified_budget_profile(p,[],{})
-    assert validate_monetary_reply(reply,COMMERCIAL,lead_profile=profile)[0]==reply
-    assert validate_monetary_reply('Van Buren costs USD 100,000.',COMMERCIAL,lead_profile=profile)[1]['replaced']
+    assert validate_monetary_reply(reply,COMMERCIAL,lead_profile={})[0]==reply
+    assert validate_monetary_reply('Van Buren costs USD 100,000.',COMMERCIAL,lead_profile={})[1]['replaced']
 
 
 @pytest.mark.parametrize('message',[
@@ -89,7 +88,7 @@ def test_temporary_search_preserves_primary_even_if_model_uses_old_filters(messa
     prior=d.capture_primary(p,{'update_search_preferences'})
     p.message=message; p.inbound_id='next'; p.domain_observations=[]
     old={'scope':'temporary','criteria':{'bedrooms':3,'max_price_usd':350000}}
-    assert d.reconcile_temporary_filters(message,p.state,old)['criteria']=={'bedrooms':4,'max_price_usd':400000}
+    assert d.strict_search_bounds(message,old)==old
     p.search(old['criteria'],[VAN],source=p.inbound_id)
     assert d.ensure_search(p,[observed('search_properties')],{'search_properties'})
     assert p.state['search_preferences']==prior
@@ -202,3 +201,43 @@ def test_exclusive_price_filter_preserves_displayed_cap():
     assert d.strict_search_bounds(request.replace('under','up to'),args)==args
     compound={**args,'criteria':{**args['criteria'],'min_bathrooms':2}}
     assert d.strict_search_bounds(request,compound)==compound
+
+
+def test_independent_queries_preserve_narrower_cap_and_recover_exact_request():
+    p=LifecyclePort('Show me the available 3 bedroom houses under $350,000 as a numbered list.')
+    exact={'scope':'temporary','criteria':{'bedrooms':3,'max_price_usd':350000}}
+    narrower={'scope':'temporary','criteria':{'bedrooms':3,'max_price_usd':310000}}
+    p.invoke('search_properties',d.strict_search_bounds(p.message,exact),'scope')
+    first=deepcopy(p.search_batches[-1]);assert first['search']['match_count']==2
+    independent=d.strict_search_bounds(p.message,narrower)
+    assert independent==narrower
+    p.invoke('search_properties',independent,'scope')
+    assert p.search_batches[-1]['search']['match_count']==1
+    assert p.search_batches[0]==first
+    assert d.ensure_search(p,[observed('search_properties')]*2,{'search_properties'})
+    assert p.state['active_search']['match_count']==2
+    assert p.search_batches[1]['search']['criteria']['max_price_usd']==310000
+    assert p.state['search_preferences']['revision']==0
+
+
+@pytest.mark.parametrize('profile',[{}, {'facts':{'budget_maximum':{'value':350000}}}])
+def test_recovered_no_match_passes_both_monetary_boundaries(profile):
+    p=LifecyclePort('Find 6 bedroom homes below $100,000.')
+    original=deepcopy(profile)
+    assert d.ensure_search(p,[],{'search_properties'})
+    reply=d.search_reply(p,[],'sms',model_reply='I can help.')
+    prepared,evidence=validate_monetary_reply(reply,COMMERCIAL,lead_profile=profile)
+    dispatched,backstop=validate_monetary_reply(prepared,COMMERCIAL,lead_profile=profile)
+    assert reply==prepared==dispatched and not evidence.get('replaced') and not backstop.get('replaced')
+    assert profile==original and 'within your stated budget' in reply
+    assert validate_monetary_reply('Van Buren costs USD 100,000.',COMMERCIAL,lead_profile=profile)[1]['replaced']
+
+
+def test_new_primary_ack_passes_dispatch_before_crm_write():
+    p=LifecyclePort('My maximum budget is $350,000. I need exactly 3 bedrooms.')
+    assert d.capture_primary(p,{'update_search_preferences'})
+    reply=d.primary_ack(p,[])
+    assert 'stated budget limit' in reply and 'exactly 3 bedrooms' in reply
+    for _ in range(2):
+        checked,evidence=validate_monetary_reply(reply,COMMERCIAL,lead_profile={})
+        assert checked==reply and not evidence.get('replaced')

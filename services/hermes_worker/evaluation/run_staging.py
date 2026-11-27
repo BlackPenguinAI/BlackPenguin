@@ -16,6 +16,7 @@ from xml.etree import ElementTree as ET
 from run_lane import sdk_revision
 from diagnostics import parse_trace
 from lifecycle_evidence import parse_lifecycle
+from offline_evidence import parse_failures
 from staging_scenarios import CASE_IDS, CHECKPOINTS
 
 TRANSPORT = ('test_closed_gate_and_auth','test_unknown_job_and_invalid_run',
@@ -23,11 +24,15 @@ TRANSPORT = ('test_closed_gate_and_auth','test_unknown_job_and_invalid_run',
 LANES = {
     'offline': ('test_staging_transport.py','test_staging_harness.py'),
     'model': ('test_staging_conversations.py',),
+    'imperfect': ('test_turn_lifecycle_harness.py',),
 }
 
 
 def expected_cases(lane):
     if lane=='model':return {('test_staging_conversations',f'test_staging_scenario[{i}]'):i for i in CASE_IDS}
+    if lane=='imperfect':
+        return {('test_turn_lifecycle_harness',f'test_lifecycle_imperfect_sdk[{family}-{i}]'):f'{family}-{i}'
+                for family in ('temporary','no-match','visit') for i in (1,2,3)}
     return {**{('test_staging_transport',n):n for n in TRANSPORT},
             **{('test_staging_harness',f'test_staging_harness[{i}]'):i for i in CASE_IDS}}
 
@@ -50,6 +55,7 @@ def summarize(path, lane):
         found[identity]={'case':identity,'status':status,'last_checkpoint':codes[-1] if safe and codes else None,
                          'trace_status':trace_status,'events':events}
         if lane=='model':found[identity]['lifecycle']=parse_lifecycle(case)
+        elif status=='FAIL':found[identity]['offline_failures']=parse_failures(case)
     missing=sorted(set(expected.values())-set(found))
     result={'expected':len(expected),'total':len(cases),'passed':sum(x['status']=='PASS' for x in found.values()),
             'failed':sum(x['status']=='FAIL' for x in found.values()),'skipped':sum(x['status']=='SKIP' for x in found.values()),
@@ -71,15 +77,19 @@ def run(lane,commit,output):
             report['reason']='ISOLATED_ENVIRONMENT_REQUIRED';return report
         if lane=='model' and (os.environ.get('HEI06_RUN_MODEL')!='1' or os.environ.get('OPENROUTER_API_KEY') in (None,'','test-only')):
             report['reason']='EXPLICIT_MODEL_OPT_IN_AND_KEY_REQUIRED';return report
-        if lane=='offline' and os.environ.get('OPENROUTER_API_KEY')!='test-only':
+        if lane!='model' and os.environ.get('OPENROUTER_API_KEY')!='test-only':
             report['reason']='OFFLINE_TEST_KEY_REQUIRED';return report
         report['sdk_revision']=sdk_revision()
         with tempfile.TemporaryDirectory(prefix='hei06-controlled-') as tmp:
             junit=Path(tmp)/'results.xml'
             args=[sys.executable,'-m','pytest','-q',*[str(Path(__file__).with_name(x)) for x in LANES[lane]],
                 '--disable-warnings','--show-capture=no','--tb=no','--junitxml='+str(junit)]
+            env={**os.environ,'PYTEST_DISABLE_PLUGIN_AUTOLOAD':'1'}
+            if lane!='model':
+                args[3:3]=['-p','offline_evidence']
+                env['PYTHONPATH']=str(Path(__file__).resolve().parent)+os.pathsep+env.get('PYTHONPATH','')
             with (Path(tmp)/'pytest.log').open('w') as stream:
-                completed=subprocess.run(args,env={**os.environ,'PYTEST_DISABLE_PLUGIN_AUTOLOAD':'1'},
+                completed=subprocess.run(args,env=env,
                     stdout=stream,stderr=subprocess.STDOUT,timeout=1800)
             report.update(summarize(junit,lane),exit_code=completed.returncode)
             ok=(completed.returncode==0 and report['passed']==report['expected']==report['total'] and

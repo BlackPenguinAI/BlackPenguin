@@ -179,8 +179,10 @@ def _live_port(db,snapshot,working,inbound,holds):
                 db.rollback()
 
         def _search(self,args):
-            from .commercial_delivery import reconcile_temporary_filters,strict_search_bounds
-            args=reconcile_temporary_filters(self.message,self.state,args)
+            from .commercial_delivery import strict_search_bounds
+            # Hermes may run independent exploratory searches. Do not replace
+            # its explicit arguments with the buyer's requested search. The
+            # delivery boundary can recover an omitted exact query once.
             args=strict_search_bounds(self.message,args)
             result=super()._search(args)
             if result.get('ok'):
@@ -318,7 +320,7 @@ def prepare_live_turn(db,scope,*,inbound_message_id,run_id):
     buyer_message=inbound.content; channel=conversation.channel
     db.commit()  # no row lock or open transaction during LLM inference
     from .commercial_delivery import (primary_declaration,primary_ack,search_reply,visit_reply,compare_reply,
-        verified_budget_profile,capture_primary,prepare_visit_choice,ensure_search,safe_visit_tools)
+        capture_primary,prepare_visit_choice,ensure_search,safe_visit_tools)
     primary_snapshot=None
     if len(sources)==1:
         # Demo begin_turn: capture only explicit self-declarations and resolve
@@ -356,7 +358,7 @@ def prepare_live_turn(db,scope,*,inbound_message_id,run_id):
     booking=working.get('confirmation_request') or {}
     material_now=pending.get('source_inbound_message_id')==inbound_message_id
     booking_now=booking.get('status')=='execution_requested' and booking.get('confirmed_inbound_message_id')==inbound_message_id
-    canonical_budget=False
+    canonical_search_reply=False
     if material_now and booking_now:
         raise ProductionToolError('Concurrent commercial effects need separate turns.')
     if material_now:reply='I found the requested material. I still need to validate the share before sending it.'
@@ -376,7 +378,7 @@ def prepare_live_turn(db,scope,*,inbound_message_id,run_id):
             commercial_reply=compare_reply(port,result.tool_observations)
         if commercial_reply is None:
             commercial_reply=search_reply(port,result.tool_observations,channel,model_reply=reply)
-            canonical_budget=commercial_reply is not None
+            canonical_search_reply=commercial_reply is not None
         # A simple explicit declaration is a state update, not a required
         # search. Keep the natural answer when it is already grounded; the
         # monetary fallback below can acknowledge the verified declaration.
@@ -386,16 +388,16 @@ def prepare_live_turn(db,scope,*,inbound_message_id,run_id):
     from app.modules.sales_agent.monetary_policy import validate_monetary_reply
     from app.modules.sales_agent.language_policy import detect,scoped_names
     reply=render_channel_text(reply,channel)
-    initial_profile=(verified_budget_profile(port,result.tool_observations,lead_view.lead_profile_data)
-                     if canonical_budget else lead_view.lead_profile_data)
-    checked,evidence=validate_monetary_reply(reply,data.commercial,lead_profile=initial_profile)
+    # Use the same persisted-profile monetary evidence as live_service._dispatch.
+    # A canonical search reply must not depend on a preparation-only exemption.
+    checked,evidence=validate_monetary_reply(reply,data.commercial,lead_profile=lead_view.lead_profile_data)
     from .numbered_catalog import reconcile_direct_catalog
     # A direct, exact catalog-list request is a structured presentation
     # contract even if the model happened to quote valid prices. Preserve its
     # order when proven, and avoid letting a speculative search change the
     # membership of the new menu. Non-eligible turns keep the ordinary path.
     direct_repair = None
-    if not (material_now or booking_now or len(sources)>1 or canonical_budget) and port.search_batches:
+    if not (material_now or booking_now or len(sources)>1 or canonical_search_reply) and port.search_batches:
         direct_repair=reconcile_direct_catalog(reply,buyer_message=buyer_message,
             search_batches=port.search_batches,menus=port.menus,observations=catalog_observations,
             active_search=working.get('active_search'),inbound_id=inbound_message_id,
@@ -437,10 +439,9 @@ def prepare_live_turn(db,scope,*,inbound_message_id,run_id):
             if candidate is None:
                 raise ProductionToolError('Reply requires monetary reconciliation before dispatch.')
             candidate=render_channel_text(candidate,channel)
-            # Only our canonical, evidence-derived repair may use this
-            # ephemeral buyer-budget exemption. Original model text cannot.
-            budget_profile=verified_budget_profile(port,result.tool_observations,lead_view.lead_profile_data)
-            checked,evidence=validate_monetary_reply(candidate,data.commercial,lead_profile=budget_profile)
+            # A newly declared preference is persisted after delivery. Do not
+            # manufacture an earlier CRM write to make this reply pass.
+            checked,evidence=validate_monetary_reply(candidate,data.commercial,lead_profile=lead_view.lead_profile_data)
             if checked!=candidate or evidence.get('replaced'):
                 raise ProductionToolError('Reply requires monetary reconciliation before dispatch.')
             reply=candidate

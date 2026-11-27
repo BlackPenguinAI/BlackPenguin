@@ -15,6 +15,7 @@ import sys
 import tempfile
 from xml.etree import ElementTree as ET
 from diagnostics import case_details
+from offline_evidence import parse_failures
 
 PINNED_SDK = 'b94cb8e2c4ebf2a8c7688cf676c3cf9899584adb'
 LANES = {
@@ -69,6 +70,9 @@ def run(lane, commit, output):
             env={**os.environ,'PYTEST_DISABLE_PLUGIN_AUTOLOAD':'1'}
             args=[sys.executable,'-m','pytest','-q',*[str(Path(__file__).with_name(name)) for name in files],
                   '--disable-warnings','--show-capture=no','--tb=no','--junitxml='+str(junit)]
+            if lane != 'openrouter_sdk':
+                args[3:3] = ['-p', 'offline_evidence']
+                env['PYTHONPATH'] = str(Path(__file__).resolve().parent) + os.pathsep + env.get('PYTHONPATH','')
             # No pytest/stdout or raw JUnit artifacts from the model lane. A
             # traceback or SDK diagnostic could include a URL or provider key.
             # Offline logs are also suppressed for consistent reporting.
@@ -77,6 +81,11 @@ def run(lane, commit, output):
             report.update(counts(junit),exit_code=result.returncode)
             if lane == 'openrouter_sdk':
                 report['diagnostics'] = case_details(junit)
+            elif junit.is_file():
+                # Export only allowlisted locations and enum values, not test IDs or exception text.
+                report['offline_failures'] = [item for case in ET.parse(junit).iter('testcase')
+                    if case.find('failure') is not None or case.find('error') is not None
+                    for item in [{'failures':parse_failures(case)}]]
             ok=(result.returncode==0 and report['total']==expected and report['passed']==expected
                 and report['failed']==report['skipped']==report['duplicate_cases']==0)
             if lane == 'openrouter_sdk':
