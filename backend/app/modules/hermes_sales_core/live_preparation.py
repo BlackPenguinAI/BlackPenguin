@@ -120,6 +120,7 @@ def _live_port(db,snapshot,working,inbound,holds):
             self.comparison_rows=[];self.comparison_details={};self.primary_captured=False
             self.prepared_visit=None;self.domain_observations=[]
             self.semantic_media_discovery=None
+            self.prepared_booking=None;self.latest_reply_id=None;self.details_read=False
             self.prior_visit_offer=deepcopy(working.get('last_slot_search'))
             self.prior_visit_draft=deepcopy(working.get('visit_draft'))
 
@@ -147,7 +148,9 @@ def _live_port(db,snapshot,working,inbound,holds):
                         if set(self.comparison_details)=={r['reference'] for r in self.comparison_rows}:
                             self.comparison_batches.append(list(deepcopy(self.comparison_details).values()))
                     return result
-            return super()._details(args)
+            result=super()._details(args)
+            if result.get('ok'):self.details_read=True
+            return result
 
         def _compare(self,args):
             from .conversation_parity import display_name
@@ -159,8 +162,27 @@ def _live_port(db,snapshot,working,inbound,holds):
             return result
 
         def _slots(self,args):
+            from .journey_contract import enrich_slots
+            from .conversation_parity import focus_ref
+            args=dict(args)
+            draft=self.state.get('visit_draft') or {}
+            # A partially initialized draft must not hide the known property.
+            if (draft.get('status') not in (None,'idle','confirmed') and not draft.get('unit_id')
+                    and focus_ref(self.state) and not (self.state.get('conversation_focus') or {}).get('ambiguous')):
+                draft['unit_id']=focus_ref(self.state)
+            choice=self.choice or {}
+            if choice.get('type')=='visit_day' and choice.get('status')=='resolved':
+                prior=self.prior_visit_offer or {}
+                if (prior.get('unit_id')==choice.get('unit_id') and prior.get('time_preference') in {'morning','afternoon','evening'}
+                        and args.get('time_preference') in (None,'any') and not choice.get('explicit')):
+                    args['time_preference']=prior['time_preference']
             result=super()._slots(args)
             if result.get('ok'):
+                result=enrich_slots(result,self.state.get('last_slot_search'),self.state.get('visit_draft'),args)
+                request=self.state.get('confirmation_request') or {}
+                if (request.get('kind')=='book' and request.get('status') in {'recap_required','awaiting_confirmation'}
+                        and request.get('proposal_id')!=result.get('proposal_id')):
+                    self.state['confirmation_request']=None
                 options = result.get('available_slots') or result.get('available_dates') or []
                 result = {**result, 'availability_status': 'AVAILABLE' if options else 'NO_SLOTS'}
                 self.slot_batches.append({'result':deepcopy(result),'offer':deepcopy(self.state.get('last_slot_search')),
@@ -175,6 +197,12 @@ def _live_port(db,snapshot,working,inbound,holds):
             if holds:
                 return {'error':'Approved commercial restrictions require staff review.','error_code':'COMMERCIAL_POLICY_HOLD'}
             try:
+                if self.prepared_booking:
+                    expected=self.prepared_booking['args']
+                    if name=='book_onsite_visit' and all(arguments.get(k)==v for k,v in expected.items()):
+                        return deepcopy(self.prepared_booking['result'])
+                    return {'error':'Use the verified booking request already prepared for this turn.',
+                            'error_code':'BOOKING_CONFIRMATION_ALREADY_RESOLVED'}
                 from .commercial_delivery import replay_visit_choice
                 resolved=replay_visit_choice(self,name,arguments)
                 from .material_continuity import redact
@@ -225,6 +253,11 @@ def _live_port(db,snapshot,working,inbound,holds):
             return super()._preferences_draft(args)
 
         def _select_time(self,args):
+            offer=self.state.get('last_slot_search') or {}
+            if offer.get('menu_kind') and (offer['menu_kind']!='visit_time' or
+                    offer.get('source_reply_message_id')!=self.latest_reply_id):
+                return {'error':'First show the verified times for the selected day.',
+                        'error_code':'DELIVERED_OFFER_REQUIRED'}
             _,project,_,_=require_scoped_entities(db,snapshot.scope)
             location=resolve_visit_location(project)
             if not location or not location.get('address'):
@@ -268,6 +301,12 @@ def _live_port(db,snapshot,working,inbound,holds):
                             'Use the property name. Optionally offer one useful verified next step. '
                             'Do not claim delivery or another operation succeeded yet.')}
             return outcome
+
+        def _book_request(self,args):
+            from .journey_contract import draft_first_booking
+            if not (self.state.get('last_slot_search') or {}).get('menu_kind'):
+                return super()._book_request(args)
+            return draft_first_booking(self,args)
 
         def _cancel_request(self,args):
             from .live_changes import draft_change
@@ -348,6 +387,10 @@ def prepare_live_turn(db,scope,*,inbound_message_id,run_id):
             'Address them together. Earlier messages are context, not current authorization. '
             'Do not claim an operation occurred; ask for a fresh explicit instruction when needed.')
     port=_live_port(db,data,working,inbound,holds);port.prepare_context(context)
+    port.latest_reply_id=latest.id if latest else None
+    from . import journey_contract as journey
+    context['commercial_journey_guidance']=journey.GUIDANCE
+    context['conversation_phase']=working.get('conversation_phase')
     from .live_domain_parity import live_preference_context
     port.contextual_preference = (live_preference_context(db,scope,conversation,inbound,loaded.data)
                                   if len(sources)==1 else {})
@@ -377,6 +420,9 @@ def prepare_live_turn(db,scope,*,inbound_message_id,run_id):
                 and primary_snapshot is None):
             raise ProductionToolError('Explicit preference capture requires reconciliation.')
         selected=prepare_visit_choice(port,enabled)
+        prepared_booking=journey.prepare_confirmation(port,enabled)
+        if prepared_booking:
+            context['verified_booking_request']=prepared_booking
         context.update(primary_preferences=deepcopy(working.get('search_preferences')),
             visit_draft=deepcopy(working.get('visit_draft')),
             last_slot_search=deepcopy(working.get('last_slot_search')),
@@ -429,6 +475,8 @@ def prepare_live_turn(db,scope,*,inbound_message_id,run_id):
     # on the normal path. Finalize against the actual resulting search rows.
     if len(sources)==1:
         ensure_search(port,result.tool_observations,enabled)
+        if not port.prepared_booking:
+            journey.recover_explicit_material(port,result.tool_observations,enabled)
     catalog_observations=(port.domain_observations[:pre_domain_count]+result.tool_observations+
                           port.domain_observations[pre_domain_count:])
     reply=port.finalize_reply(result.reply)
@@ -460,7 +508,9 @@ def prepare_live_turn(db,scope,*,inbound_message_id,run_id):
             raise ProductionToolError('Verified visit selection requires reconciliation.')
         # Domain-owned verified delivery contracts, as in demo v13.3.3.
         # Never re-run an external action or replace Hermes's inference loop.
-        commercial_reply=visit_reply(port,result.tool_observations,enabled)
+        commercial_reply=journey.visit_reply(port,result.tool_observations,enabled)
+        if commercial_reply is None:
+            commercial_reply=visit_reply(port,result.tool_observations,enabled)
         if commercial_reply is None:
             commercial_reply=compare_reply(port,result.tool_observations)
         if commercial_reply is None:
@@ -593,6 +643,8 @@ def prepare_live_turn(db,scope,*,inbound_message_id,run_id):
             raise ProductionToolError('Reply requires language reconciliation before dispatch.')
         log.warning('Hermes read-only recovery: language validation')
         reply=candidate
+    if len(sources)==1:
+        journey.update_phase(port,loaded.data)
     working.pop('_active_source_message_id',None)
     # Persist actual domain calls as well as SDK calls. No invented execution;
     # the evaluator distinguishes pre/post-domain calls from SDK traces.

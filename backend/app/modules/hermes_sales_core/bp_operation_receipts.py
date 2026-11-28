@@ -80,7 +80,8 @@ def evidence_live_inbound(db, scope, inbound_message_id: str, *, after_reply_mes
 def visible_menu(reply: str, menu: dict) -> bool:
     """Every numbered line must have the exact server-produced option label."""
     opts = menu.get('options') or []
-    if not 2 <= len(opts) <= 10:
+    minimum = 1 if menu.get('type') in {'visit_day','visit_time'} and menu.get('display_name') else 2
+    if not minimum <= len(opts) <= 10:
         return False
     lines = {}
     for line in reply.splitlines():

@@ -233,7 +233,17 @@ def _validate_booking_evidence(db, scope, conversation, inbound, state, now):
     request = deepcopy(state.get('confirmation_request') or {})
     if request.get('kind')!='book' or request.get('confirmed_inbound_message_id')!=inbound.id:
         raise ProductionToolError('No first-visit request for this turn.')
-    _accepted_request(db,scope,request,inbound.id,now=now)
+    from .journey_contract import booking_consent
+    from .bp_operation_receipts import evidence_live_inbound
+    from .bp_operational_port import AFFIRMATIVE
+    if AFFIRMATIVE.fullmatch(inbound.content):
+        _accepted_request(db,scope,request,inbound.id,now=now)
+    else:
+        # Additional explicit variants use the same scoped, persisted recap proof.
+        if not (_fresh(request,now) and request.get('status')=='execution_requested'
+                and request.get('recap_message_id') and booking_consent(inbound.content)):
+            raise ProductionToolError('Explicit booking confirmation is required.')
+        evidence_live_inbound(db,scope,inbound.id,after_reply_message_id=request['recap_message_id'])
     offer=state.get('last_slot_search') or {}
     if (not _fresh(offer,now) or offer.get('project_id')!=scope.project_id
             or offer.get('proposal_id')!=request.get('proposal_id') or offer.get('unit_id')!=request.get('unit_id')
@@ -250,7 +260,28 @@ def _validate_booking_evidence(db, scope, conversation, inbound, state, now):
     # The selected time must be visible in the delivered offer, not only in
     # hidden tool output. An exact recap is required immediately before assent.
     offered_text=offered.content.casefold()
-    if (str(request['unit_id']).casefold() not in offered_text
+    visible_record = {'unit_id':request['unit_id']}
+    if offer.get('menu_kind'):
+        from .bp_context import require_scoped_entities
+        from .bp_operation_receipts import _property_visible
+        _, project, _, _ = require_scoped_entities(db,scope)
+        property_id, unit_id, verified_name = _resolve_property(db,scope,project,request['unit_id'],conversation.channel)
+        # Individual inventory may render the approved type plus its unit code.
+        # Require the exact verified unit code, not the database UUID.
+        label = request.get('display_name') or ''
+        name_matches = (label == verified_name if property_id else
+                        bool(re.search(r'(?<![\w-])'+re.escape(verified_name)+r'(?![\w-])',label,re.I)))
+        if (offer['menu_kind']!='visit_time' or not name_matches):
+            raise ProductionToolError('A verified property and exact-day time offer are required.')
+        visible_record['display_name']=label
+        visible_property=_property_visible(offered.content,visible_record)
+        # The selected start must be a numbered option, not incidental prose.
+        if not any(re.fullmatch(r'\s*[1-9][.)]\s+'+re.escape(_time_label(request['start_time']))+r'\s*',line,re.I)
+                   for line in offered.content.splitlines()):
+            raise ProductionToolError('The selected start time was not a visible option.')
+    else:
+        visible_property=str(request['unit_id']).casefold() in offered_text
+    if (not visible_property
             or not any(v.casefold() in offered_text for v in (request['date'],_date_label(request['date'])))
             or not any(v.casefold() in offered_text for v in (request['start_time'],_time_label(request['start_time'])))):
         raise ProductionToolError('The selected slot was not visible in the accepted offer.')
@@ -306,6 +337,8 @@ def execute_first_live_booking(db, scope, *, inbound_message_id):
     state=deepcopy(loaded.data)
     state['confirmation_request']={**request,'status':'committed','result':result}
     state['visit_draft']={**(state.get('visit_draft') or {}),'status':'confirmed'}
+    state['conversation_phase']='appointment_confirmed'
+    state['visit_planning_paused']=False
     revision=save(db,scope,expected_revision=loaded.revision,event_key='hei03b:'+request['id'],
         state=state,event_type='state_update').revision
     run.output_snapshot={**(run.output_snapshot or {}),'native_live_booking':{'operation_id':op.id,

@@ -200,7 +200,8 @@ def _validate_references(db, scope: TurnScope, state: dict) -> None:
                 or source.status not in {'sent', 'delivered', 'accepted', 'read'}):
             raise PermissionError('Hermes menu is not tied to a valid outbound message')
         opts = menu.get('options') or []
-        if not isinstance(opts, list) or not 2 <= len(opts) <= 10:
+        minimum = 1 if menu.get('type') in {'visit_day','visit_time'} and menu.get('display_name') else 2
+        if not isinstance(opts, list) or not minimum <= len(opts) <= 10:
             raise ValueError('Hermes menu options are invalid')
         # The model's hidden tool results are not a buyer-visible menu. Read
         # the ACTUAL outbound text and prove every displayed option existed.

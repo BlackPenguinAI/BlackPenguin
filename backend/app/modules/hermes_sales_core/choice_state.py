@@ -11,8 +11,9 @@ from . import contextual_choices
 def record_delivered_menu(state: dict, *, menu: dict, outbound_message_id: str) -> dict:
     if not isinstance(outbound_message_id, str) or not outbound_message_id.strip():
         raise ValueError('An actual outbound message ID is required')
-    if len(menu.get('options') or []) < 2:
-        raise ValueError('A selectable menu requires at least two actual options')
+    minimum = 1 if menu.get('type') in {'visit_day','visit_time'} and menu.get('display_name') else 2
+    if len(menu.get('options') or []) < minimum:
+        raise ValueError('A selectable menu requires actual options')
     recorded = contextual_choices.menu_record(menu, reply_message_id=outbound_message_id)
     # Live delivery already verified this scoped commercial label against the
     # actual text. Preserve it for the next turn's identical visible_menu proof.
